@@ -1,0 +1,54 @@
+<!-- Footer -->
+<footer class="footer" id="mg-globalfooter">
+    <div class="container">
+        <section id="mg-gf-footer-logo">
+            <div class="row align-items-center">
+                {% if request.resolver_match.view_name != 'main_page:index' %}
+                    <div class="col-md-4">
+                        <div class="footer-logo">
+                            <a href="{{ url('main_page:index') }}">
+                                <img src="assets/img/logo.png" alt="Logo">
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+                </div> 
+            </div>
+        </section>
+        <section class="ms-3" id="mg-gf-footer-legal">
+            <div class="row align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="footer-legal-copyright text-black" style="font-size:13px; --bs-text-opacity: .4;">© 2024 Muserium Glass. All rights reserved.</div>
+                    <ul class="mg-gf-footer-legal-links d-flex list-unstyled mt-3 ms-5" style="font-size:13px;" role="list">
+                        <li class="mg-gf-footer-legal-link-item mx-2" role="listitem">
+                            <a href="#" class="mg-gf-footer-legal-link text-decoration-none text-black" style="--bs-text-opacity: .8;">개인정보 처리방침</a>
+                        </li>
+                        |
+                        <li class="mg-gf-footer-legal-link-item mx-2" role="listitem">
+                            <a href="#" class="mg-gf-footer-legal-link text-decoration-none text-black" style="--bs-text-opacity: .8;">웹 사이트 이용 약관</a>
+                        </li>
+                        |
+                        <li class="mg-gf-footer-legal-link-item mx-2" role="listitem">
+                            <a href="#" class="mg-gf-footer-legal-link text-decoration-none text-black" style="--bs-text-opacity: .8;">사이트 맵</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <section class="ms-3" id="mg-gf-footer-info">
+            <div class="row align-items-center">
+                <div class="col-md">
+                    <div class="footer-info">
+                        <p class="requirement text-black" style="font-size:11px; --bs-text-opacity: .4;">
+                            <span style="white-space:nowrap;">brand |</span>
+                            <span style="white-space:nowrap;">대표: |</span>
+                            <span style="white-space:nowrap;">주소: |</span>
+                            <span style="white-space:nowrap;">전화: |</span>
+                            <span style="white-space:nowrap;">사업자등록번호: |</span>
+                            <span style="white-space:nowrap;">통신판매업신고번호: |</span>
+                        </p>
+                    </div>
+            </div>
+        </section>
+    </div>
+</footer>
