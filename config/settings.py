@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'channels',
+    'corsheaders',
     'main_page',
 ]
 
@@ -53,7 +53,15 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
+
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ORIGIN_WHITELIST = (
+    # VUE Frontend Port
+    'http://localhost:5173',    
+    'http://127.0.0.1:5173',    
+)
 
 ROOT_URLCONF = 'config.urls'
 
@@ -68,6 +76,10 @@ TEMPLATES = [
                 'jinja2.ext.do',
                 'jinja2.ext.loopcontrols',
                 'jinja2.ext.i18n',
+            ],
+            'context_processors': [
+                'config.context_processors.global_settings',    # Footer 정보를 전역으로 사용하기 위한 context_processors
+                'config.context_processors.vite_asset',          # Vite.js asset을 전역으로 사용하기 위한 context_processors
             ],
         },
     },
@@ -138,8 +150,9 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
-    BASE_DIR / 'frontend/dist',
     BASE_DIR / 'static',
+    BASE_DIR / 'static/dist', # Vue.js build files
+    BASE_DIR / 'frontend',
 ]
 
 # Default primary key field type
@@ -153,3 +166,12 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels.layers.InMemoryChannelLayer'
     }
 }
+
+# Footer Informations
+BRAND_NAME = env('BRAND_NAME')
+CEO_NAME = env('CEO_NAME')
+ADDRESS =  env('ADDRESS')
+PHONE_NUMBER = env('PHONE_NUMBER')
+BUSINESS_REGISTRATION_NUMBER = env('BUSINESS_REGISTRATION_NUMBER')
+ECOMMERCE_REGISTRATION_NUMBER = env('ECOMMERCE_REGISTRATION_NUMBER')
+CPO_NAME = env('CPO_NAME')

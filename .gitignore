@@ -8,6 +8,12 @@
 **db.sqlite3
 **media/
 **static/
+**templates/
+**templates/**
+
+# vue 관련
+**node_modules/
+
 
 # 기타 프로젝트 관련
 **run_uvicorn.sh
