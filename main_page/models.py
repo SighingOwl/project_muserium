@@ -1,9 +1,8 @@
 from django.db import models
 
 class Carousel(models.Model):
-    '''
-    A carousel for the main page
-    '''
+    #A carousel for the main page
+
     title = models.CharField(max_length=50, default='Carousel Title')
     image_url = models.URLField(max_length=200)
     background_color = models.CharField(max_length=50, default='#000000')
@@ -13,9 +12,8 @@ class Carousel(models.Model):
         return self.title
 
 class Card(models.Model):
-    '''
-    A card for the main page
-    '''
+    #A card for the main page
+
     title = models.CharField(max_length=50)
     image_url = models.URLField(max_length=200)
     alt = models.CharField(max_length=100)
