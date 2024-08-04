@@ -24,7 +24,6 @@
 **node_modules
 **dist
 **dist-ssr
-**.local
 
 # Editor directories and files
 **.vscode/*
@@ -42,3 +41,4 @@
 
 # 기타 프로젝트 관련
 **run_uvicorn.sh
+**backup
