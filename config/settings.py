@@ -42,8 +42,23 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
-    'main_page',
+    'storages',
+    'common.apps.CommonConfig',
+    'main_page.apps.MainPageConfig',
+    'glass_class.apps.ClassConfig',
+
 ]
+
+AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = env('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = env('AWS_S3_REGION_NAME')
+AWS_S3_CUSTOM_DOMAIN = env('AWS_CLOUDFRONT_DOMAIN')
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_STORAGE_BUCKET_NAME}/'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -66,23 +81,6 @@ CORS_ORIGIN_WHITELIST = (
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.jinja2.Jinja2',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'environment': 'config.jinja2.environment',
-            'extensions': [
-                'jinja2.ext.do',
-                'jinja2.ext.loopcontrols',
-                'jinja2.ext.i18n',
-            ],
-            'context_processors': [
-                'config.context_processors.global_settings',    # Footer 정보를 전역으로 사용하기 위한 context_processors
-                'config.context_processors.vite_asset',          # Vite.js asset을 전역으로 사용하기 위한 context_processors
-            ],
-        },
-    },
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
@@ -151,8 +149,6 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
-    BASE_DIR / 'static/dist', # Vue.js build files
-    BASE_DIR / 'frontend',
 ]
 
 # Default primary key field type

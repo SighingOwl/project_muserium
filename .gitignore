@@ -42,3 +42,4 @@
 # 기타 프로젝트 관련
 **run_uvicorn.sh
 **backup
+**pyproject_tmp.toml

@@ -23,8 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main_page.urls')),
     #path('about/', include('about.urls')),
-    #path('news/', include('news.urls')),
-    #path('one_day_class/', include('one_day_class.urls')),
+    path('class/', include('glass_class.urls')),
     #path('shop/', include('shop.urls')),
 ]
 

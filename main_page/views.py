@@ -19,15 +19,3 @@ class CardListView(APIView):
         cards = Card.objects.all()
         serializer = CardSerializer(cards, many=True)
         return Response(serializer.data)
-
-
-
-
-def index(request):
-    '''
-    Show the cards of the main page
-    '''
-    carousels = Carousel.objects.all()
-    cards = Card.objects.all()
-    return render(request, 'main_page/index.html', {'carousels': carousels,'cards': cards})
-
