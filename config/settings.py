@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'storages',
+    'django_extensions',
     'common.apps.CommonConfig',
     'main_page.apps.MainPageConfig',
     'glass_class.apps.ClassConfig',
@@ -71,18 +72,31 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:5173',
-]
-CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SECURE = False
+# HTTPS Configuration
+SECURE_SSL_REDIRECT = True
 
+# Cookie Configuration
+SESSION_COOKIE_SECURE = True
+
+# HSTS Configuration
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = [
+    'https://localhost:5173',
+]
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = True
+
+# CORS Configuration
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_ALLOW_ALL = False
 CORS_ORIGIN_WHITELIST = (
     # VUE Frontend Port
-    'http://localhost:5173',    
-    'http://127.0.0.1:5173',    
+    'https://localhost:5173',    
+    'https://127.0.0.1:5173',    
 )
 
 ROOT_URLCONF = 'config.urls'
