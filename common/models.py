@@ -8,7 +8,8 @@ from glass_class.models import GlassClass
 
 class Image(models.Model):
     # Image model
-    title = models.CharField(max_length=127)
+
+    title = models.CharField(max_length=255)
     image = models.ImageField(upload_to='images/')
 
 class TimeStampedModel(models.Model):
@@ -19,36 +20,33 @@ class TimeStampedModel(models.Model):
         abstract = True
 
 class ContentModel(TimeStampedModel):
-    title = models.CharField(max_length=127)
+    # Content model
+
     author = models.ForeignKey(User, on_delete=models.CASCADE)
-    content = models.TextField()
+    content = models.TextField(max_length=500)
 
     class Meta:
         abstract = True
 
-class Review(models.Model):
+class Review(ContentModel):
     # Review model
 
-    rating = models.IntegerField(validators=[MinValueValidator(0), MaxValueValidator(5)])
+    rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], default=1)
+    teacher_rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(3)], default=1)
+    readiness_rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(3)], default=1)
+    content_rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(3)], default=1)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
 
-    def clean(self):
-        super.clean()
-        if self.rating < 0 or self.rating > 5:
-            raise ValidationError('Rating must be between 0 and 5')
-
-class QnA(models.Model):
+class QnA(ContentModel):
     # QnA model
 
+    title = models.CharField(max_length=255)
     is_secret = models.BooleanField(default=False)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
 
-class Comment(models.Model):
+class Comment(ContentModel):
     # Comment model
 
-    title = models.CharField(max_length=127)
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
-    content = models.TextField()
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
