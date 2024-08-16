@@ -1,46 +1,31 @@
 import json
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.models import User
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.decorators.http import require_POST
-from django.middleware.csrf import get_token
+from django.views.decorators.csrf import csrf_protect
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from .models import Image, Review, QnA, Comment
+from ..models import Review
 from glass_class.models import GlassClass
-from .forms import ImageForm, ReviewForm, QnAForm, CommentForm
-
-
-# Temporary function for development
-@ensure_csrf_cookie
-def get_csrf_token(request):
-    return JsonResponse({'csrfToken': get_token(request)})
-
-def mask_username(username):
-    if len(username) == 2:
-        return username[0] + '*'
-    elif len(username) == 3:
-        return username[0:2] + '*'
-    elif len(username) == 4:
-        return username[0:3] + '*'
-    else:
-        return username[0:4] + '*' * (len(username) - 4)
-
-def upload_image(request):
-    if request.method() == 'POST':
-        form = ImageForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            return render(request, 'upload_image.html', {'form': form})
+from ..forms import ReviewForm
+from .common import mask_username
 
 #@login_required(login_url='#')
 @require_POST
-@csrf_exempt
-def create_class_review(request, glass_class_id):
+@csrf_protect
+def create_class_review(request):
     # Create a review
 
     if request.method == 'POST':
+
+        glass_class_id = request.GET.get('glass_class_id')
+        if not glass_class_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid request data'
+            }, status=400)
+
         glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
 
         # Check if the user has enrolled in the class
@@ -90,10 +75,18 @@ def create_class_review(request, glass_class_id):
         'message': 'Invalid request method'
         }, stauts=400)
 
-def read_class_review(request, glass_class_id):
+def read_class_review(request):
     # Read a review
 
     if request.method == 'GET':
+
+        glass_class_id = request.GET.get('glass_class_id')
+        if not glass_class_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid request data'
+            }, status=400)
+
         target_glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
         
 
@@ -108,6 +101,7 @@ def read_class_review(request, glass_class_id):
             page_order = '-created_at'
 
         reviews = Review.objects.filter(glass_class = target_glass_class).order_by(page_order, '-created_at')
+        average_rating = sum([review.rating for review in reviews]) / len(reviews) if reviews else 0
         
         paginator = Paginator(reviews, page_size)
 
@@ -130,7 +124,7 @@ def read_class_review(request, glass_class_id):
                 'content_rating': review.content_rating,
                 'glass_class': review.glass_class.title,
                 'created_at': review.created_at,
-                'modified_at': review.modified_at if review.modified_at else None
+                'modified_at': review.modified_at if review.modified_at else None,
             })
 
         page_attrs = {
@@ -143,10 +137,10 @@ def read_class_review(request, glass_class_id):
             'start_index': review_list.start_index(),
             'end_index': review_list.end_index(),
         }
-
         return JsonResponse({
             'status': 'success',
             'reviews': review_data,
+            'average_rating': average_rating,
             'paginator': page_attrs
         }, status=200)
     
@@ -158,10 +152,17 @@ def read_class_review(request, glass_class_id):
 
 #@login_required(login_url='#')
 @require_POST
-@csrf_exempt
-def update_class_review(request, review_id):
+@csrf_protect
+def update_class_review(request):
     # update a review
-    
+
+    review_id = request.GET.get('review_id')
+    if not review_id:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid request data'
+        }, status=400)
+
     review = get_object_or_404(Review, pk=review_id)
 
     '''
@@ -215,12 +216,20 @@ def update_class_review(request, review_id):
             'message': 'Invalid request method'
         }, status=400)
 
-def delete_class_review(request, review_id):
+#@login_required(login_url='#')
+@csrf_protect
+def delete_class_review(request):
     # Delete a review
     
-    review = get_object_or_404(Review, pk=review_id)
-    
+    review_id = request.GET.get('review_id')
+    if not review_id:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid request data'
+        }, status=400)
 
+    review = get_object_or_404(Review, pk=review_id)
+    '''
     if request.user != review.author:
         return JsonResponse({
             'status': 'error',
@@ -228,41 +237,13 @@ def delete_class_review(request, review_id):
         }, status=403)
     else:
         review.delete()
-
-# Glass class QnA
-def create_class_qna(request, glass_class_id):
-    # Create a QnA
-    pass
-
-def read_class_qna(request, glass_class_id):
-    # Read a QnA
-    pass
-
-def update_class_qna(request, glass_class_id):
-    # update a QnA
-    pass
-
-def delete_class_qna(request, glass_class_id):
-    # Delete a QnA
-    pass
-
-
-# Glass class Comment
-def create_class_comment(request):
-    # Create a comment
-    pass
-
-def read_class_comment(request):
-    # Read a comment
-    pass
-
-def update_class_comment(request):
-    # update a comment
-    pass
-
-def delete_class_comment(request):
-    # Delete a comment
-
-    pass
-
-
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Review deleted successfully'
+        }, status=200)
+    '''
+    review.delete()
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Review deleted successfully'
+    }, status=200)
