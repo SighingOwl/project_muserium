@@ -14,24 +14,24 @@ from ..forms import QnAForm
 #@login_required(login_url='#')
 @require_POST
 @csrf_protect
-def create_class_qna(request, glass_class_id):
+def create_class_qna(request):
     # Create a QnA
-    
+
     pass
 
-def read_class_qna(request, glass_class_id):
+def read_class_qna(request):
     # Read a QnA
     pass
 
 #@login_required(login_url='#')
 @require_POST
 @csrf_protect
-def update_class_qna(request, glass_class_id):
+def update_class_qna(request):
     # update a QnA
     pass
 
 #@login_required(login_url='#')
 @csrf_protect
-def delete_class_qna(request, glass_class_id):
+def delete_class_qna(request):
     # Delete a QnA
     pass

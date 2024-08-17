@@ -4,6 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
+from django.utils.html import escape
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from ..models import Review
@@ -52,13 +53,13 @@ def create_class_review(request):
                 'message': 'Review created successfully',
                 'review': {
                     'id': review.id,
-                    'author': review.author.username,
-                    'content': review.content,
+                    'author': escape(review.author.username),
+                    'content': escape(review.content),
                     'rating': review.rating,
                     'teacher_rating': review.teacher_rating,
                     'readiness_rating': review.readiness_rating,
                     'content_rating': review.content_rating,
-                    'glass_class': review.glass_class.title if review.glass_class else None,
+                    'glass_class': escape(review.glass_class.title) if review.glass_class else None,
                     'created_at': review.created_at,
                     'modified_at': review.modified_at if review.modified_at else None
                 }
@@ -193,13 +194,13 @@ def update_class_review(request):
                 'message': 'Review updated successfully',
                 'review': {
                     'id': review.id,
-                    'author': review.author.username,
-                    'content': review.content,
+                    'author': escape(review.author.username),
+                    'content': escape(review.content),
                     'rating': review.rating,
                     'teacher_rating': review.teacher_rating,
                     'readiness_rating': review.readiness_rating,
                     'content_rating': review.content_rating,
-                    'glass_class': review.glass_class.title,
+                    'glass_class': escape(review.glass_class.title),
                     'created_at': review.created_at,
                     'modified_at': review.modified_at
                 }
@@ -229,7 +230,7 @@ def delete_class_review(request):
         }, status=400)
 
     review = get_object_or_404(Review, pk=review_id)
-    '''
+    
     if request.user != review.author:
         return JsonResponse({
             'status': 'error',
@@ -241,9 +242,3 @@ def delete_class_review(request):
             'status': 'success',
             'message': 'Review deleted successfully'
         }, status=200)
-    '''
-    review.delete()
-    return JsonResponse({
-        'status': 'success',
-        'message': 'Review deleted successfully'
-    }, status=200)
