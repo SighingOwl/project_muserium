@@ -11,12 +11,18 @@ urlpatterns = [
     path('reviews/create/class/', views.create_class_review, name='create_class_review'),
     path('reviews/read/class/', views.read_class_review, name='read_class_review'),
     path('reviews/update/class/', views.update_class_review, name='update_class_review'),
-    path('reviews/delete/class%review/', views.delete_class_review, name='delete_class_review'),
+    path('reviews/delete/class/', views.delete_class_review, name='delete_class_review'),
 
-    # QnAs
-    path('qa/create/class/', views.create_class_qna, name='create_class_qna'),
-    path('qa/read/class/', views.read_class_qna, name='read_class_qna'),
-    path('qa/update/class/', views.update_class_qna, name='update_class_qna'),
-    path('qa/delete/class/', views.delete_class_qna, name='delete_class_qna'),
+    # questions
+    path('question/create/class/', views.create_class_question, name='create_class_question'),
+    path('question/read/class/', views.read_class_question, name='read_class_question'),
+    path('question/get-question-content/class/', views.get_question_content, name='get_question_content'),
+    path('question/update/class/', views.update_class_question, name='update_class_question'),
+    path('question/delete/class/', views.delete_class_question, name='delete_class_question'),
+    path('question/increase-view-count/', views.increase_question_view_count, name='increase_question_view_count'),
     
+    # answers
+    path('answer/create/class/', views.create_class_answer, name='create_class_answer'),
+    path('answer/update/class/', views.update_class_answer, name='update_class_answer'),
+    path('answer/delete/class/', views.delete_class_answer, name='delete_class_answer'),
 ]

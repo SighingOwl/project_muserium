@@ -12,6 +12,8 @@ from glass_class.models import GlassClass
 from ..forms import ReviewForm
 from .common import mask_username
 
+# Glass class Review
+
 #@login_required(login_url='#')
 @require_POST
 @csrf_protect
@@ -55,13 +57,13 @@ def create_class_review(request):
                     'id': review.id,
                     'author': escape(review.author.username),
                     'content': escape(review.content),
-                    'rating': review.rating,
-                    'teacher_rating': review.teacher_rating,
-                    'readiness_rating': review.readiness_rating,
-                    'content_rating': review.content_rating,
+                    'rating': escape(review.rating),
+                    'teacher_rating': escape(review.teacher_rating),
+                    'readiness_rating': escape(review.readiness_rating),
+                    'content_rating': escape(review.content_rating),
                     'glass_class': escape(review.glass_class.title) if review.glass_class else None,
-                    'created_at': review.created_at,
-                    'modified_at': review.modified_at if review.modified_at else None
+                    'created_at': escape(review.created_at),
+                    'modified_at': escape(review.modified_at) if review.modified_at else None
                 }
             }, status=200)
         else:
@@ -193,16 +195,16 @@ def update_class_review(request):
                 'status': 'success',
                 'message': 'Review updated successfully',
                 'review': {
-                    'id': review.id,
+                    'id': escape(review.id),
                     'author': escape(review.author.username),
                     'content': escape(review.content),
-                    'rating': review.rating,
-                    'teacher_rating': review.teacher_rating,
-                    'readiness_rating': review.readiness_rating,
-                    'content_rating': review.content_rating,
+                    'rating': escape(review.rating),
+                    'teacher_rating': escape(review.teacher_rating),
+                    'readiness_rating': escape(review.readiness_rating),
+                    'content_rating': escape(review.content_rating),
                     'glass_class': escape(review.glass_class.title),
-                    'created_at': review.created_at,
-                    'modified_at': review.modified_at
+                    'created_at': escape(review.created_at),
+                    'modified_at': escape(review.modified_at)
                 }
             }, status=200)
         else:
@@ -222,23 +224,30 @@ def update_class_review(request):
 def delete_class_review(request):
     # Delete a review
     
-    review_id = request.GET.get('review_id')
-    if not review_id:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'Invalid request data'
-        }, status=400)
+    if request.method == 'DELETE':
+        review_id = request.GET.get('review_id')
+        if not review_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid request data'
+            }, status=400)
 
-    review = get_object_or_404(Review, pk=review_id)
-    
-    if request.user != review.author:
+        review = get_object_or_404(Review, pk=review_id)
+        
+        if request.user != review.author and request.user != User.objects.get(username='admin'):
+            return JsonResponse({
+                'status': 'error',
+                'message': 'You are not the author of this review'
+            }, status=403)
+        else:
+            review.delete()
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Review deleted successfully'
+            }, status=200)
+    else:
         return JsonResponse({
             'status': 'error',
-            'message': 'You are not the author of this review'
-        }, status=403)
-    else:
-        review.delete()
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Review deleted successfully'
-        }, status=200)
+            'message': 'Invalid request method'
+        }, status=400)
+    

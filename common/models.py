@@ -37,12 +37,19 @@ class Review(ContentModel):
     content_rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(3)], default=1)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
 
-class QnA(ContentModel):
+class Question(ContentModel):
     # QnA model
 
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=100)
     is_secret = models.BooleanField(default=False)
+    view_count = models.IntegerField(default=0)
+    answerd_at = models.DateTimeField(null=True, blank=True)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
+
+class Answer(ContentModel):
+    # Answer model
+
+    question = models.ForeignKey(Question, on_delete=models.CASCADE)
 
 class Comment(ContentModel):
     # Comment model
