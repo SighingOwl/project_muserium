@@ -1,6 +1,7 @@
-import json
+import boto3
+from django.conf import settings
 from django.shortcuts import get_object_or_404
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_protect
@@ -34,20 +35,29 @@ def create_class_review(request):
         # Check if the user has enrolled in the class
         # 클래스 수강생 관리 모델이 필요... if not glass_class.reservation        
 
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
 
-        form = ReviewForm(data)
+        form = ReviewForm(request.POST, request.FILES)
         if form.is_valid():
             review = form.save(commit=False)
             review.author = User.objects.get(username='admin')  # 로그인 기능 추가 후 수정 필요
             review.created_at = timezone.now()
             review.glass_class = glass_class
+            review.save()
+            
+            # Upload review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                # Upload the new image
+                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image.name}')
+                review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
+
             review.save()
 
             return JsonResponse({
@@ -57,6 +67,7 @@ def create_class_review(request):
                     'id': review.id,
                     'author': escape(review.author.username),
                     'content': escape(review.content),
+                    'image': escape(review.image),
                     'rating': escape(review.rating),
                     'teacher_rating': escape(review.teacher_rating),
                     'readiness_rating': escape(review.readiness_rating),
@@ -76,7 +87,7 @@ def create_class_review(request):
     return JsonResponse({
         'status': 'error',
         'message': 'Invalid request method'
-        }, stauts=400)
+        }, stauts=405)
 
 def read_class_review(request):
     # Read a review
@@ -121,6 +132,7 @@ def read_class_review(request):
                 'id': review.id,
                 'author': mask_username(review.author.username),
                 'content': review.content,
+                'image': review.image,
                 'rating': review.rating,
                 'teacher_rating': review.teacher_rating,
                 'readiness_rating': review.readiness_rating,
@@ -150,7 +162,7 @@ def read_class_review(request):
     return JsonResponse({
         'status': 'error',
         'message': 'Invalid request method'
-    }, status=400)
+    }, status=405)
 
 
 #@login_required(login_url='#')
@@ -177,18 +189,31 @@ def update_class_review(request):
         }, status=403)
     '''
     if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
-        
-        form = ReviewForm(data, instance=review)
+
+        form = ReviewForm(request.POST, request.FILES, instance=review)
         if form.is_valid():
             review = form.save(commit=False)
             review.modified_at = timezone.now()
+
+            # Update review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                # Delete the previous image
+                if review.image:
+                    existing_image_key = review.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                    s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+                # Upload the new image
+                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image.name}')
+                review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
+
             review.save()
 
             return JsonResponse({
@@ -198,6 +223,7 @@ def update_class_review(request):
                     'id': escape(review.id),
                     'author': escape(review.author.username),
                     'content': escape(review.content),
+                    'image': escape(review.image),
                     'rating': escape(review.rating),
                     'teacher_rating': escape(review.teacher_rating),
                     'readiness_rating': escape(review.readiness_rating),
@@ -217,7 +243,7 @@ def update_class_review(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
 
 #@login_required(login_url='#')
 @csrf_protect
@@ -240,6 +266,17 @@ def delete_class_review(request):
                 'message': 'You are not the author of this review'
             }, status=403)
         else:
+            # Delete review image from S3
+            if review.image:
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME
+                )
+                existing_image_key = review.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
             review.delete()
             return JsonResponse({
                 'status': 'success',
@@ -249,5 +286,5 @@ def delete_class_review(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
     

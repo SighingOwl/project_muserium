@@ -1,11 +1,14 @@
-from django.urls import path
-from .views import ClassListView, ClassDetailView, ClassReservationView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import ClassListViewSets, ClassViewSets, ClassReservationViewSets
 
 app_name = 'glass_class'
 
+router = DefaultRouter()
+router.register(r'classes', ClassListViewSets, basename='class')
+router.register(r'detail', ClassViewSets, basename='class_detail')
+router.register(r'reservation', ClassReservationViewSets, basename='reservation')
+
 urlpatterns = [
-    #path('', views.index, name='index'),
-    path('api/', ClassListView.as_view(), name='class_list'),
-    path('api/<str:key>/', ClassDetailView.as_view(), name='class_detail'),
-    path('api/<str:key>/reservations/', ClassReservationView.as_view(), name='class_reservation_list'),
+    path('', include(router.urls)),
 ]

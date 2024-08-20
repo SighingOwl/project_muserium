@@ -1,4 +1,5 @@
-import json
+import boto3
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.models import User
@@ -31,20 +32,28 @@ def create_class_question(request):
 
         glass_class = get_object_or_404(GlassClass, pk=glass_class_id) 
 
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
-
-        form = QuestionForm(data)
+        form = QuestionForm(request.POST, request.FILES)
         if form.is_valid():
             question = form.save(commit=False)
             question.author = User.objects.get(username='admin')  # 로그인 기능 추가 후 수정 필요
             question.created_at = timezone.now()
             question.glass_class = glass_class
+            question.save()
+
+            # Upload review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                # Upload the new image
+                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
+                question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
+
             question.save()
 
             return JsonResponse({
@@ -55,6 +64,7 @@ def create_class_question(request):
                     'title': escape(question.title),
                     'author': escape(question.author.username),
                     'content': escape(question.content),
+                    'image': escape(question.image),
                     'is_secret': escape(question.is_secret),
                     'glass_class': escape(question.glass_class.title) if question.glass_class else None,
                     'created_at': escape(question.created_at),
@@ -71,7 +81,7 @@ def create_class_question(request):
     return JsonResponse({
         'status': 'error',
         'message': 'Invalid request method'
-        }, stauts=400)
+        }, stauts=405)
 
 def read_class_question(request):
     # Read a Question
@@ -170,15 +180,17 @@ def get_question_content(request):
             'question': {
                 'id': question.id,
                 'content': question.content,
+                'image': question.image,
                 'answer_id': answer.id if answer else None,
-                'answer_content': answer.content if answer else ''
+                'answer_content': answer.content if answer else '',
+                'answer_image': answer.image if answer else None
             }
         }, status=200)
     else:
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
 
 #@login_required(login_url='#')
 @require_POST
@@ -204,18 +216,30 @@ def update_class_question(request):
         }, status=403)
     '''
     if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
-        
-        form = QuestionForm(data, instance=question)
+        form = QuestionForm(request.POST, request.FILES, instance=question)
         if form.is_valid():
             question = form.save(commit=False)
             question.modified_at = timezone.now()
+
+            # Update review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                # Delete the previous image
+                if question.image:
+                    existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                    s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+                # Upload the new image
+                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
+                question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
+
             question.save()
 
             return JsonResponse({
@@ -226,6 +250,7 @@ def update_class_question(request):
                     'title': escape(question.title),
                     'author': escape(question.author.username),
                     'content': escape(question.content),
+                    'image': escape(question.image),
                     'is_secret': escape(question.is_secret),
                     'glass_class': escape(question.glass_class.title),
                     'created_at': escape(question.created_at),
@@ -242,7 +267,7 @@ def update_class_question(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
 
 #@login_required(login_url='#')
 @csrf_protect
@@ -266,6 +291,17 @@ def delete_class_question(request):
                 'message': 'You are not the author of this question'
             }, status=403)
         else:
+            # Delete review image from S3
+            if question.image:
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME
+                )
+                existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
             question.delete()
             return JsonResponse({
                 'status': 'success',
@@ -275,7 +311,7 @@ def delete_class_question(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
 
 @require_POST
 @csrf_protect
@@ -310,8 +346,7 @@ def increase_question_view_count(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-            }, status=400)
-
+            }, status=405)
 
 # Glass class Answer for Question
 
@@ -349,20 +384,34 @@ def create_class_answer(request):
                 'message': '이미 답변된 질문입니다.'
             }, status = 400)
 
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
-
-        form = AnswerForm(data)
+        form = AnswerForm(request.POST, request.FILES)
         if form.is_valid():
             answer = form.save(commit=False)
             answer.author = User.objects.get(username='admin')
             answer.created_at = timezone.now()
             answer.question = question
+            answer.save()
+
+            # Upload review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                try:
+                    # Upload the new image
+                    s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
+                    answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{question.id}/{answer.id}/{image.name}'
+                except:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'Failed to upload image to S3'
+                    }, status=400)
+
             answer.save()
 
             return JsonResponse({
@@ -387,7 +436,7 @@ def create_class_answer(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
 
 #@login_required(login_url='#')
 @require_POST
@@ -416,18 +465,31 @@ def update_class_answer(request):
             }, status=400)
         
         answer = get_object_or_404(Answer, pk=answer_id)
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid request data'
-            }, status=400)
 
-        form = AnswerForm(data, instance=answer)
+        form = AnswerForm(request.POST, request.FILES, instance=answer)
         if form.is_valid():
             answer = form.save(commit=False)
             answer.modified_at = timezone.now()
+
+            # Update review image to S3
+            if 'image' in request.FILES:
+                image = request.FILES['image']
+                s3 = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME   
+                )
+
+                # Delete the previous image
+                if answer.image:
+                    existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                    s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+                # Upload the new image
+                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{answer.question.id}/{answer.id}/{image.name}')
+                answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{answer.question.id}/{answer.id}/{image.name}'
+
             answer.save()
             
             return JsonResponse({
@@ -437,6 +499,7 @@ def update_class_answer(request):
                     'id': escape(answer.id),
                     'author': escape(answer.author.username),
                     'content': escape(answer.content),
+                    'image' : escape(answer.image),
                     'question': escape(answer.question.title),
                     'created_at': escape(answer.created_at),
                     'modified_at': escape(answer.modified_at)
@@ -452,7 +515,7 @@ def update_class_answer(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)
     
 #@login_required(login_url='#')
 @csrf_protect
@@ -479,6 +542,22 @@ def delete_class_answer(request):
             }, status=400)
 
         answer = get_object_or_404(Answer, pk=answer_id)
+
+        # Delete review image to S3
+        if 'image' in request.FILES:
+            image = request.FILES['image']
+            s3 = boto3.client(
+                's3',
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=settings.AWS_S3_REGION_NAME   
+            )
+
+            # Delete the previous image
+            if answer.image:
+                existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
         answer.delete()
 
         return JsonResponse({
@@ -489,4 +568,4 @@ def delete_class_answer(request):
         return JsonResponse({
             'status': 'error',
             'message': 'Invalid request method'
-        }, status=400)
+        }, status=405)

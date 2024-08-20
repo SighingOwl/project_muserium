@@ -24,6 +24,7 @@ class ContentModel(TimeStampedModel):
 
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     content = models.TextField(max_length=500)
+    image = models.URLField(max_length=255, null=True, blank=True)
 
     class Meta:
         abstract = True
