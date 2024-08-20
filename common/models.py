@@ -6,12 +6,6 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import User
 from glass_class.models import GlassClass
 
-class Image(models.Model):
-    # Image model
-
-    title = models.CharField(max_length=255)
-    image = models.ImageField(upload_to='images/')
-
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField(null=True, blank=True)
@@ -28,6 +22,14 @@ class ContentModel(TimeStampedModel):
 
     class Meta:
         abstract = True
+
+class DetailInfo(TimeStampedModel):
+    # Detail info model
+
+    title = models.CharField(max_length=100)
+    image = models.URLField(max_length=255)
+    image_alt = models.CharField(max_length=100)
+    glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE)
 
 class Review(ContentModel):
     # Review model

@@ -1,9 +1,18 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from .views import ClassDetailInfoViewSets
 
 app_name = 'common'
 
+router = DefaultRouter()
+router.register(r'detail-info', ClassDetailInfoViewSets, basename='detail_info')
+
+
 urlpatterns = [
+    path('', include(router.urls)),
+
+    # Backend 코드를 rest_framwork로 구현 후 url 수정 예정
     # CSRF Token
     path('get-csrf-token/', views.get_csrf_token, name='get_csrf_token'),
 

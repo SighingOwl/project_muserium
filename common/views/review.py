@@ -27,7 +27,7 @@ def create_class_review(request):
         if not glass_class_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'glass_class_id가 필요합니다.'
             }, status=400)
 
         glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
@@ -80,13 +80,13 @@ def create_class_review(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to create review',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
 
     return JsonResponse({
         'status': 'error',
-        'message': 'Invalid request method'
+        'message': '부적절한 요청 메소드입니다.'
         }, stauts=405)
 
 def read_class_review(request):
@@ -98,7 +98,7 @@ def read_class_review(request):
         if not glass_class_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'glass_class_id가 필요합니다.'
             }, status=400)
 
         target_glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
@@ -161,7 +161,7 @@ def read_class_review(request):
     
     return JsonResponse({
         'status': 'error',
-        'message': 'Invalid request method'
+        'message': '부적절한 요청 메소드입니다.'
     }, status=405)
 
 
@@ -175,7 +175,7 @@ def update_class_review(request):
     if not review_id:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request data'
+            'message': 'review_id가 필요합니다.'
         }, status=400)
 
     review = get_object_or_404(Review, pk=review_id)
@@ -185,7 +185,7 @@ def update_class_review(request):
     if request.user != review.author:
         return JsonResponse({
             'status': 'error',
-            'message': 'You are not the author of this review'
+            'message': '이 글의 작성자가 아닙니다.'
         }, status=403)
     '''
     if request.method == 'POST':
@@ -236,13 +236,13 @@ def update_class_review(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to update review',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
 
 #@login_required(login_url='#')
@@ -255,7 +255,7 @@ def delete_class_review(request):
         if not review_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'review_id가 필요합니다.'
             }, status=400)
 
         review = get_object_or_404(Review, pk=review_id)
@@ -263,7 +263,7 @@ def delete_class_review(request):
         if request.user != review.author and request.user != User.objects.get(username='admin'):
             return JsonResponse({
                 'status': 'error',
-                'message': 'You are not the author of this review'
+                'message': '이 글의 작성자가 아닙니다.'
             }, status=403)
         else:
             # Delete review image from S3
@@ -285,6 +285,6 @@ def delete_class_review(request):
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
     

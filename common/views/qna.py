@@ -27,7 +27,7 @@ def create_class_question(request):
         if not glass_class_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'glass_class_id가 필요합니다.'
             }, status=400)
 
         glass_class = get_object_or_404(GlassClass, pk=glass_class_id) 
@@ -74,13 +74,13 @@ def create_class_question(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to create question',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
 
     return JsonResponse({
         'status': 'error',
-        'message': 'Invalid request method'
+        'message': '부적절한 요청 메소드입니다.'
         }, stauts=405)
 
 def read_class_question(request):
@@ -92,7 +92,7 @@ def read_class_question(request):
         if not glass_class_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'glass_class_id가 필요합니다.'
             }, status=400)
 
         target_glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
@@ -158,8 +158,8 @@ def read_class_question(request):
     
     return JsonResponse({
         'status': 'error',
-        'message': 'Invalid request method'
-    }, status=400)
+        'message': '부적절한 요청 메소드입니다.'
+    }, status=405)
 
 def get_question_content(request):
     # Get a Question content
@@ -169,7 +169,7 @@ def get_question_content(request):
         if not question_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'question_id가 필요합니다.'
             }, status=400)
 
         question = get_object_or_404(Question, pk=question_id)
@@ -189,7 +189,7 @@ def get_question_content(request):
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
 
 #@login_required(login_url='#')
@@ -202,7 +202,7 @@ def update_class_question(request):
     if not question_id:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request data'
+            'message': 'question_id가 필요합니다.'
         }, status=400)
 
     question = get_object_or_404(Question, pk=question_id)
@@ -260,13 +260,13 @@ def update_class_question(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to update question',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
 
 #@login_required(login_url='#')
@@ -280,7 +280,7 @@ def delete_class_question(request):
         if not question_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'question_id가 필요합니다.'
             }, status=400)
 
         question = get_object_or_404(Question, pk=question_id)
@@ -288,7 +288,7 @@ def delete_class_question(request):
         if request.user != question.author and request.user != User.objects.get(username='admin'):
             return JsonResponse({
                 'status': 'error',
-                'message': 'You are not the author of this question'
+                'message': '이 글의 작성자가 아닙니다.'
             }, status=403)
         else:
             # Delete review image from S3
@@ -310,7 +310,7 @@ def delete_class_question(request):
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
 
 @require_POST
@@ -322,7 +322,7 @@ def increase_question_view_count(request):
     if not question_id:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request data'
+            'message': 'question_id가 필요합니다.'
         }, status=400)
     
     question = get_object_or_404(Question, pk=question_id)
@@ -345,7 +345,7 @@ def increase_question_view_count(request):
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
             }, status=405)
 
 # Glass class Answer for Question
@@ -373,7 +373,7 @@ def create_class_answer(request):
         if not question_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'question_id가 필요합니다.'
             }, status=400)
 
         question = get_object_or_404(Question, pk=question_id)
@@ -409,7 +409,7 @@ def create_class_answer(request):
                 except:
                     return JsonResponse({
                         'status': 'error',
-                        'message': 'Failed to upload image to S3'
+                        'message': '이미지 업로드에 실패했습니다.'
                     }, status=400)
 
             answer.save()
@@ -429,13 +429,13 @@ def create_class_answer(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to create answer',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
 
 #@login_required(login_url='#')
@@ -461,7 +461,7 @@ def update_class_answer(request):
         if not answer_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'answer_id가 필요합니다.'
             }, status=400)
         
         answer = get_object_or_404(Answer, pk=answer_id)
@@ -508,13 +508,13 @@ def update_class_answer(request):
         else:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Failed to update answer',
+                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
                 'errors': form.errors
             }, status=400)
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
     
 #@login_required(login_url='#')
@@ -529,7 +529,7 @@ def delete_class_answer(request):
     if request.user != User.objects.get(username='admin'):
         return JsonResponse({
             'status': 'error',
-            'message': 'You are not allowed to delete an answer'
+            'message': '관리자 권한이 필요합니다.'
         }, status=403)
     '''
 
@@ -538,7 +538,7 @@ def delete_class_answer(request):
         if not answer_id:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Invalid request data'
+                'message': 'answer_id가 필요합니다.'
             }, status=400)
 
         answer = get_object_or_404(Answer, pk=answer_id)
@@ -567,5 +567,5 @@ def delete_class_answer(request):
     else:
         return JsonResponse({
             'status': 'error',
-            'message': 'Invalid request method'
+            'message': '부적절한 요청 메소드입니다.'
         }, status=405)
