@@ -219,6 +219,8 @@ def update_class_question(request):
     if request.method == 'POST':
         form = QuestionForm(request.POST, request.FILES, instance=question)
         if form.is_valid():
+            original_question = Question.objects.get(pk=question_id)
+
             question = form.save(commit=False)
             question.modified_at = timezone.now()
 
@@ -227,8 +229,8 @@ def update_class_question(request):
                 image = request.FILES['image']
 
                 # Delete the previous image
-                if question.image:
-                    existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                if original_question.image:
+                    existing_image_key = original_question.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                     s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
                 # Upload the new image
@@ -271,6 +273,13 @@ def delete_class_question(request):
 
     if request.method == 'DELETE':
 
+        user_id = request.GET.get('user_id')
+        if not user_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'user_id가 필요합니다.'
+            }, status=400)
+
         question_id = request.GET.get('question_id')
         if not question_id:
             return JsonResponse({
@@ -278,24 +287,37 @@ def delete_class_question(request):
                 'message': 'question_id가 필요합니다.'
             }, status=400)
 
+        user = User.objects.get(pk=user_id)
         question = get_object_or_404(Question, pk=question_id)
+        glass_class = question.glass_class
         
-        if request.user != question.author and request.user != User.objects.get(username='admin'):
-            return JsonResponse({
-                'status': 'error',
-                'message': '이 글의 작성자가 아닙니다.'
-            }, status=403)
-        else:
-            # Delete review image from S3
+        if user == question.author or user == User.objects.get(username='admin'):
+            # Delete answer image from S3 before deleting the question
+            if Answer.objects.filter(question=question).exists():
+                answer = Answer.objects.get(question=question)
+                if answer.image:
+                    existing_image_key = answer.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
+                    s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+            # Delete question image from S3
             if question.image:
-                existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                existing_image_key = question.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                 s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
             question.delete()
+
+            glass_class.questions -= 1
+            glass_class.save()
+
             return JsonResponse({
                 'status': 'success',
                 'message': 'question deleted successfully'
             }, status=200)
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': '이 글의 작성자가 아닙니다.'
+            }, status=403)
     else:
         return JsonResponse({
             'status': 'error',
@@ -451,6 +473,8 @@ def update_class_answer(request):
 
         form = AnswerForm(request.POST, request.FILES, instance=answer)
         if form.is_valid():
+            original_answer = Answer.objects.get(pk=answer_id)
+
             answer = form.save(commit=False)
             answer.modified_at = timezone.now()
 
@@ -459,8 +483,8 @@ def update_class_answer(request):
                 image = request.FILES['image']
 
                 # Delete the previous image
-                if answer.image:
-                    existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                if original_answer.image:
+                    existing_image_key = original_answer.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                     s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
                 # Upload the new image
@@ -499,8 +523,7 @@ def update_class_answer(request):
 def delete_class_answer(request):
     # Delete an answer
 
-    '''
-    로그인 기능 추가 후 실행 예정
+    #로그인 기능 추가 후 수정
     # Only admin can delete an answer
 
     if request.user != User.objects.get(username='admin'):
@@ -508,7 +531,6 @@ def delete_class_answer(request):
             'status': 'error',
             'message': '관리자 권한이 필요합니다.'
         }, status=403)
-    '''
 
     if request.method == 'DELETE':
         answer_id = request.GET.get('answer_id')
@@ -526,7 +548,7 @@ def delete_class_answer(request):
 
             # Delete the previous image
             if answer.image:
-                existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                existing_image_key = answer.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                 s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
         answer.delete()

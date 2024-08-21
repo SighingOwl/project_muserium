@@ -31,6 +31,15 @@ class DetailInfo(TimeStampedModel):
     image_alt = models.CharField(max_length=100)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE)
 
+class Like(TimeStampedModel):
+    # Like model
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'glass_class')
+
 class Review(ContentModel):
     # Review model
 

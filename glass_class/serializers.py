@@ -4,7 +4,7 @@ from .models import GlassClass, Reservation
 class ClassSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = GlassClass
-		fields = ['id', 'title', 'teacher', 'category', 'short_description', 'price', 'image_url', 'image_alt', 'likes', 'interests', 'created_at']
+		fields = ['id', 'title', 'teacher', 'category', 'short_description', 'price', 'image_url', 'image_alt', 'likes', 'reviews', 'total_rating', 'average_rating', 'questions', 'created_at']
 
 class ClassDetailSerializer(serializers.ModelSerializer):
 	class Meta:

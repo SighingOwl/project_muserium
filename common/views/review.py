@@ -51,6 +51,7 @@ def create_class_review(request):
             review.author = User.objects.get(username='admin')  # 로그인 기능 추가 후 수정 필요
             review.created_at = timezone.now()
             review.glass_class = glass_class
+
             review.save()
             
             # Upload review image to S3
@@ -62,6 +63,12 @@ def create_class_review(request):
                 review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
 
             review.save()
+
+            glass_class.reviews += 1
+            glass_class.total_rating += review.rating
+            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+
+            glass_class.save()
 
             return JsonResponse({
                 'status': 'success',
@@ -104,7 +111,7 @@ def read_class_review(request):
                 'message': 'glass_class_id가 필요합니다.'
             }, status=400)
 
-        target_glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
+        glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
         
 
         # Pagination
@@ -117,8 +124,7 @@ def read_class_review(request):
         if page_order not in vaild_order_fields:
             page_order = '-created_at'
 
-        reviews = Review.objects.filter(glass_class = target_glass_class).order_by(page_order, '-created_at')
-        average_rating = sum([review.rating for review in reviews]) / len(reviews) if reviews else 0
+        reviews = Review.objects.filter(glass_class = glass_class).order_by(page_order, '-created_at')
         
         paginator = Paginator(reviews, page_size)
 
@@ -158,7 +164,7 @@ def read_class_review(request):
         return JsonResponse({
             'status': 'success',
             'reviews': review_data,
-            'average_rating': average_rating,
+            'average_rating': glass_class.average_rating,
             'paginator': page_attrs
         }, status=200)
     
@@ -195,23 +201,35 @@ def update_class_review(request):
 
         form = ReviewForm(request.POST, request.FILES, instance=review)
         if form.is_valid():
+            original_review = Review.objects.get(pk=review_id)
+
+            # Get existing glass_class rating before updating
+            glass_class = original_review.glass_class
+            glass_class.total_rating -= original_review.rating
+            glass_class.save()
+
             review = form.save(commit=False)
             review.modified_at = timezone.now()
 
             # Update review image to S3
             if 'image' in request.FILES:
-                image = request.FILES['image']
+                image_file = request.FILES['image']
 
                 # Delete the previous image
-                if review.image:
-                    existing_image_key = review.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                if original_review.image:
+                    existing_image_key = original_review.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                     s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
                 # Upload the new image
-                s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image.name}')
-                review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
+                s3_client.upload_fileobj(image_file, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image_file.name}')
+                review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image_file.name}'
 
             review.save()
+
+            # Update glass_class rating
+            glass_class.total_rating += review.rating
+            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+            glass_class.save()
 
             return JsonResponse({
                 'status': 'success',
@@ -254,25 +272,40 @@ def delete_class_review(request):
                 'status': 'error',
                 'message': 'review_id가 필요합니다.'
             }, status=400)
-
-        review = get_object_or_404(Review, pk=review_id)
         
-        if request.user != review.author and request.user != User.objects.get(username='admin'):
+        user_id = request.GET.get('user_id')
+        if not user_id:
             return JsonResponse({
                 'status': 'error',
-                'message': '이 글의 작성자가 아닙니다.'
-            }, status=403)
-        else:
+                'message': 'user_id가 필요합니다.'
+            }, status=400)
+
+        review = get_object_or_404(Review, pk=review_id)
+        user = get_object_or_404(User, pk=user_id)
+        
+        if user == review.author or user == User.objects.get(username='admin'):
             # Delete review image from S3
             if review.image:
-                existing_image_key = review.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
+                existing_image_key = review.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
                 s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+            # Update glass_class rating
+            glass_class = review.glass_class
+            glass_class.reviews -= 1
+            glass_class.total_rating -= review.rating
+            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+            glass_class.save()
 
             review.delete()
             return JsonResponse({
                 'status': 'success',
                 'message': 'Review deleted successfully'
             }, status=200)
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': '이 글의 작성자가 아닙니다.'
+            }, status=403)
     else:
         return JsonResponse({
             'status': 'error',

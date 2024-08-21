@@ -25,6 +25,10 @@ class ClassListViewSets(viewsets.ModelViewSet):
     def list_classes(self, request):
         # List all classes with sorting
         sort_by = request.query_params.get('sort_by', '-created_at')
+        vaild_sort_by = ['-created_at', 'title', 'price', '-price', '-likes', '-average_rating']
+        if sort_by not in vaild_sort_by:
+            return Response({'error': '잘못된 정렬 기준입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
         queryset = self.filter_queryset(self.get_queryset()).order_by(sort_by)
 
         page_size = request.query_params.get('page_size', 5)

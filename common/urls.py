@@ -1,12 +1,13 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
-from .views import ClassDetailInfoViewSets
+from .views import ClassDetailInfoViewSets, LikeViewSets
 
 app_name = 'common'
 
 router = DefaultRouter()
 router.register(r'detail-info', ClassDetailInfoViewSets, basename='detail_info')
+router.register(r'like', LikeViewSets, basename='like')
 
 
 urlpatterns = [

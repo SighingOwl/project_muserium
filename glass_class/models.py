@@ -14,8 +14,10 @@ class GlassClass(models.Model):
     image_url = models.URLField()
     image_alt = models.CharField(max_length=50)
     likes = models.IntegerField(default=0)
-    dislikes = models.IntegerField(default=0)
-    interests = models.IntegerField(default=0)
+    reviews = models.IntegerField(default=0)
+    total_rating = models.IntegerField(default=0)
+    average_rating = models.FloatField(default=0)
+    questions = models.IntegerField(default=0)
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField(null=True, blank=True)
 
