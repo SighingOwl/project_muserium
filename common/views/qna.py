@@ -13,6 +13,14 @@ from glass_class.models import GlassClass
 from ..forms import QuestionForm, AnswerForm
 from .common import mask_username
 
+# 리소스 누수를 방지하기 위한 전역적으로 boto3 클라이언트 생성
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    region_name=settings.AWS_S3_REGION_NAME
+)
+
 # Glass class Question
 
 #@login_required(login_url='#')
@@ -43,15 +51,8 @@ def create_class_question(request):
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                    region_name=settings.AWS_S3_REGION_NAME   
-                )
-
                 # Upload the new image
-                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
+                s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
                 question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
 
             question.save()
@@ -224,20 +225,14 @@ def update_class_question(request):
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                    region_name=settings.AWS_S3_REGION_NAME   
-                )
 
                 # Delete the previous image
                 if question.image:
                     existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
-                    s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+                    s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
                 # Upload the new image
-                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
+                s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
                 question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
 
             question.save()
@@ -293,14 +288,8 @@ def delete_class_question(request):
         else:
             # Delete review image from S3
             if question.image:
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                    region_name=settings.AWS_S3_REGION_NAME
-                )
                 existing_image_key = question.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
-                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+                s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
             question.delete()
             return JsonResponse({
@@ -395,16 +384,10 @@ def create_class_answer(request):
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                    region_name=settings.AWS_S3_REGION_NAME   
-                )
 
                 try:
                     # Upload the new image
-                    s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
+                    s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
                     answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{question.id}/{answer.id}/{image.name}'
                 except:
                     return JsonResponse({
@@ -474,20 +457,14 @@ def update_class_answer(request):
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
-                s3 = boto3.client(
-                    's3',
-                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                    region_name=settings.AWS_S3_REGION_NAME   
-                )
 
                 # Delete the previous image
                 if answer.image:
                     existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
-                    s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+                    s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
                 # Upload the new image
-                s3.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{answer.question.id}/{answer.id}/{image.name}')
+                s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{answer.question.id}/{answer.id}/{image.name}')
                 answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{answer.question.id}/{answer.id}/{image.name}'
 
             answer.save()
@@ -546,17 +523,11 @@ def delete_class_answer(request):
         # Delete review image to S3
         if 'image' in request.FILES:
             image = request.FILES['image']
-            s3 = boto3.client(
-                's3',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                region_name=settings.AWS_S3_REGION_NAME   
-            )
 
             # Delete the previous image
             if answer.image:
                 existing_image_key = answer.image.split(f'https://{settings.AWS_S3_CUSTOM_DOMAIN}/{settings.AWS_STORAGE_BUCKET_NAME}/')[1]
-                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+                s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
         answer.delete()
 
