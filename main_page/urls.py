@@ -1,10 +1,13 @@
-from django.urls import path
-from .views import CardListView, CarouselListView
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from .views import CardListViewSets, CarouselListViewSets
 
 app_name = 'main_page'
 
+routers = DefaultRouter()
+routers.register(r'cards', CardListViewSets, basename = 'cards')
+routers.register(r'carousels', CarouselListViewSets, basename = 'carousels')
+
 urlpatterns = [
-    #path('', views.index, name='index'),
-    path('api/cards/', CardListView.as_view(), name='card_list'),
-    path('api/carousels/', CarouselListView.as_view(), name='carousel_list'),
+    path('', include(routers.urls)),
 ]
