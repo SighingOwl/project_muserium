@@ -6,6 +6,7 @@
 
 # Django 관련
 **db.sqlite3
+**db_tmp.sqlite3
 **media/
 **static/
 **templates/
@@ -38,6 +39,7 @@
 
 # Environment
 **.env
+**secrets.json
 
 # 기타 프로젝트 관련
 **run_uvicorn.sh

@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -16,7 +17,7 @@ class TimeStampedModel(models.Model):
 class ContentModel(TimeStampedModel):
     # Content model
 
-    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     content = models.TextField(max_length=500)
     image = models.URLField(max_length=255, null=True, blank=True)
 
@@ -34,7 +35,7 @@ class DetailInfo(TimeStampedModel):
 class Like(TimeStampedModel):
     # Like model
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE)
 
     class Meta:
