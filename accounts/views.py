@@ -6,13 +6,14 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from allauth.socialaccount.providers.naver import views as naver_views
 from dj_rest_auth.registration.views import SocialLoginView
-from dj_rest_auth.views import LoginView, LogoutView
+from dj_rest_auth.views import LogoutView
 from .models import User
-from .serializers import UserInfoSerializer
+from .serializers import UserInfoSerializer, RegisterSerializer
 
 import requests
 import certifi
@@ -20,6 +21,69 @@ import certifi
 # main domain(http://127.0.0.1:8000)
 main_domain = settings.MAIN_DOMAIN
 frontend_domain = 'https://localhost:5173'
+
+class RegisterAPIView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+
+            token = TokenObtainPairSerializer().get_token(serializer.instance)
+            refresh_token = str(token)
+            access_token = str(token.access_token)
+
+            user = User.objects.get(email=serializer.data['email'])
+            
+            return Response({
+                "refresh": refresh_token,
+                "access": access_token,
+                "user": {
+                    "email": user.email,
+                    "name": user.name,
+                    "phone_number": user.mobile,
+                    "address": user.address,
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return JsonResponse({
+                "error": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+class LoginAPIView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email', None)
+        password = request.data.get('password', None)
+
+        if email is None:
+            return JsonResponse({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if password is None:
+            return JsonResponse({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+            if not user.check_password(password):
+                return JsonResponse({"error": "Password is incorrect."}, status=status.HTTP_204_NO_CONTENT)
+        except User.DoesNotExist:
+            return JsonResponse({"error": "User does not exist."}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        token = TokenObtainPairSerializer().get_token(user)
+        refresh_token = str(token)
+        access_token = str(token.access_token)
+
+        return Response({
+            "refresh": refresh_token,
+            "access": access_token,
+            "user": {
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.mobile,
+                "address": user.address,
+            }
+        }, status=status.HTTP_200_OK)
 
 class NaverLoginAPIView(APIView):
     # 로그인을 위한 창은 누구든 접속이 가능해야 하기 때문에 permission을 AllowAny로 설정
@@ -68,69 +132,6 @@ class NaverCallbackAPIView(APIView):
             return JsonResponse({
                 "error": e,
             }, status=status.HTTP_404_NOT_FOUND)
-
-class UserDataAPIViewSets(viewsets.ViewSet):
-    permission_classes = (IsAuthenticated, )
-
-    @action(detail=False, methods=['get'])
-    def get(self, request, *args, **kwargs):
-            '''
-            User info get request
-            '''
-
-            access_token = request.query_params.get("naver_token", None)
-            if access_token is None:
-                return JsonResponse({"error": "Access Token is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-            user_info_request = requests.get(
-                "https://openapi.naver.com/v1/nid/me",
-                headers={"Authorization": f"Bearer {access_token}",},
-                verify=certifi.where()
-            )
-            
-            # User 정보를 가지고 오는 요청이 잘못된 경우
-            if user_info_request.status_code != 200:
-                return JsonResponse({"error": "failed to get user information."}, status=status.HTTP_400_BAD_REQUEST)
-
-            user_info = user_info_request.json().get("response")
-            serializer = UserInfoSerializer(data=user_info)
-            if serializer.is_valid():
-                email = serializer.data["email"]
-                phone_number = serializer.data["mobile"]
-                name = serializer.data["name"]
-                nickname = serializer.data["nickname"] if "nickname" in serializer.data else None    
-            else:
-                return JsonResponse({
-                    "error": serializer.errors
-                }, status=status.HTTP_400_BAD_REQUEST)      
-
-            '''
-            #User information check
-            '''
-            # User의 email 을 받아오지 못한 경우
-            if email is None:
-                return JsonResponse({
-                    "error": "Can't Get Email Information from Naver"
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # User의 phone_number를 받아오지 못한 경우
-            if phone_number is None:
-                return JsonResponse({
-                    "error": "Can't Get Phone Number Information from Naver"
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            # User의 name을 받아오지 못한 경우
-            if name is None:
-                return JsonResponse({
-                    "error": "Can't Get Name Information from Naver"
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            return Response({
-                "email": email,
-                "phone_number": phone_number,
-                "name": name,
-                "nickname": nickname
-            }, status=status.HTTP_200_OK)
 
 class LoginToDjangoAPIViewSets(viewsets.ViewSet):
     permission_classes = (AllowAny,)
@@ -222,7 +223,70 @@ class NaverToDjangoLoginView(SocialLoginView):
     adapter_class = naver_views.NaverOAuth2Adapter
     client_class = OAuth2Client
 
-class NaverLogoutAPIView(LogoutView):
+class NaverUserDataAPIViewSets(viewsets.ViewSet):
+    permission_classes = (IsAuthenticated, )
+
+    @action(detail=False, methods=['get'])
+    def get(self, request, *args, **kwargs):
+            '''
+            User info get request
+            '''
+
+            access_token = request.query_params.get("naver_token", None)
+            if access_token is None:
+                return JsonResponse({"error": "Access Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            user_info_request = requests.get(
+                "https://openapi.naver.com/v1/nid/me",
+                headers={"Authorization": f"Bearer {access_token}",},
+                verify=certifi.where()
+            )
+            
+            # User 정보를 가지고 오는 요청이 잘못된 경우
+            if user_info_request.status_code != 200:
+                return JsonResponse({"error": "failed to get user information."}, status=status.HTTP_400_BAD_REQUEST)
+
+            user_info = user_info_request.json().get("response")
+            serializer = UserInfoSerializer(data=user_info)
+            if serializer.is_valid():
+                email = serializer.data["email"]
+                phone_number = serializer.data["mobile"]
+                name = serializer.data["name"]
+                nickname = serializer.data["nickname"] if "nickname" in serializer.data else None    
+            else:
+                return JsonResponse({
+                    "error": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)      
+
+            '''
+            #User information check
+            '''
+            # User의 email 을 받아오지 못한 경우
+            if email is None:
+                return JsonResponse({
+                    "error": "Can't Get Email Information from Naver"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # User의 phone_number를 받아오지 못한 경우
+            if phone_number is None:
+                return JsonResponse({
+                    "error": "Can't Get Phone Number Information from Naver"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # User의 name을 받아오지 못한 경우
+            if name is None:
+                return JsonResponse({
+                    "error": "Can't Get Name Information from Naver"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                "email": email,
+                "phone_number": phone_number,
+                "name": name,
+                "nickname": nickname
+            }, status=status.HTTP_200_OK)
+    
+class LogoutAPIView(LogoutView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
@@ -246,3 +310,17 @@ class NaverLogoutAPIView(LogoutView):
         '''
         # django logout
         return super().post(request, *args, **kwargs)
+
+class CheckEmailAPIView(APIView):
+    permission_classes = (AllowAny,)
+
+    def get(self, request, *args, **kwargs):
+        email = request.query_params.get('email', None)
+        if email is None:
+            return JsonResponse({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+            return JsonResponse({"exists": True}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return JsonResponse({"exists": False}, status=status.HTTP_200_OK)

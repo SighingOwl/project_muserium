@@ -7,7 +7,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     username = models.CharField(max_length=128, blank=True)
     email = models.EmailField(db_index=True, unique=True)
-    phone_number = models.CharField(max_length=128, blank=True)
+    mobile = models.CharField(max_length=13, blank=True)
+    name = models.CharField(max_length=128, blank=True)
     nickname = models.CharField(max_length=128, blank=True)
     address = models.CharField(max_length=255, blank=True)
 
