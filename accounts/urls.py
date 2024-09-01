@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import RegisterAPIView, LoginAPIView, NaverLoginAPIView, NaverCallbackAPIView, NaverUserDataAPIViewSets, LoginToDjangoAPIViewSets, NaverToDjangoLoginView, LogoutAPIView, CheckEmailAPIView
+from .views import RegisterAPIView, LoginAPIView, NaverLoginAPIView, NaverCallbackAPIView, NaverUserDataAPIViewSets, LoginToDjangoAPIViewSets, NaverToDjangoLoginView, LogoutAPIView, CheckEmailAPIView, RestoreEmail, ResetPassword
 
 app_name = 'accounts'
 
@@ -19,5 +19,7 @@ urlpatterns = [
     path('naver/callback/', NaverCallbackAPIView.as_view(), name='naver-callback'),
     path('naver/login/success/', NaverToDjangoLoginView.as_view(), name='naver-login-success'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+    path('auth/restore-email/', RestoreEmail.as_view(), name='restore-email'),
+    path('auth/reset-password/', ResetPassword.as_view(), name='reset-password'),
     
 ]

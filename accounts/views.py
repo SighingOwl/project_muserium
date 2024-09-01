@@ -324,3 +324,49 @@ class CheckEmailAPIView(APIView):
             return JsonResponse({"exists": True}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return JsonResponse({"exists": False}, status=status.HTTP_200_OK)
+
+class RestoreEmail(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        name = request.data.get('name', None)
+        mobile = request.data.get('mobile', None)
+        if name is None:
+            return Response({"error": "사용자 이름 정보가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if mobile is None:
+            return Response({"error": "휴대폰 번호 정보가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(name=name, mobile=mobile)
+            return Response({"email": user.email}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        
+class ResetPassword(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email', None)
+        name = request.data.get('name', None)
+        if email is None:
+            return Response({"error": "이메일 정보가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if name is None:
+            return Response({"error": "사용자 이름 정보가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # 추후에 이메일로 전송하는 방식으로 변경 -> amazon ses 사용
+            user = User.objects.get(email=email, name=name)
+            password = self.generate_password()
+            user.set_password(password)
+            user.save()
+            return Response({"password": password}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        
+    def generate_password(self):
+        import random
+        import string
+
+        password = ''.join(random.choice(string.ascii_letters + string.digits) for i in range(8))
+
+        return password
