@@ -9,8 +9,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(db_index=True, unique=True)
     mobile = models.CharField(max_length=13, blank=True)
     name = models.CharField(max_length=128, blank=True)
-    nickname = models.CharField(max_length=128, blank=True)
+    postcode = models.CharField(max_length=10, blank=True)
     address = models.CharField(max_length=255, blank=True)
+    address_detail = models.CharField(max_length=255, blank=True)
+    address_extra = models.CharField(max_length=255, blank=True)
 
     is_active = models.BooleanField(default=True)
 

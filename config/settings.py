@@ -151,6 +151,8 @@ CORS_ORIGIN_WHITELIST = (
 )
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'Authorization',
+    'current_password',
+    'new_password',
 ]
 
 ROOT_URLCONF = 'config.urls'
