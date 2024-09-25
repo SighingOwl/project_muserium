@@ -7,6 +7,7 @@ from django.middleware.csrf import get_token
 def get_csrf_token(request):
     return JsonResponse({'csrfToken': get_token(request)})
 
+# mask username
 def mask_username(username):
     if len(username) == 2:
         return username[0] + '*'
