@@ -71,8 +71,8 @@ jobs:
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
         with:
           args: >
-            - -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            - -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
-            - -Dsonar.sources=.
-            - -Dsonar.host.url=https://sonarcloud.io
-            - -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.sources=.
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
