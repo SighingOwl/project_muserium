@@ -51,7 +51,7 @@ jobs:
       # django 프로젝트에서 사용할 비밀을 json으로 받아와 적용
       - name: Create secrets.json
         run: |
-          printf "%s" '${{ secrets.SECRETS_JSON }}" > secrets.json
+          printf "%s" '${{ secrets.SECRETS_JSON }}' > secrets.json
 
       # Poetry를 사용해 의존성을 관리하므로 pip 대신 워크플로우에 poetry를 사용하도록 설정    
       - name: Install Poetry
