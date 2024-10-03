@@ -51,7 +51,7 @@ jobs:
       # django 프로젝트에서 사용할 비밀을 json으로 받아와 적용
       - name: Create secrets.json
         run: |
-          printf "%s" '${{ secrets.SECRETS_JSON }}' > secrets.json
+          printf "%s" '${{ secrets.SECRETS_JSON }}" > secrets.json
 
       # Poetry를 사용해 의존성을 관리하므로 pip 대신 워크플로우에 poetry를 사용하도록 설정    
       - name: Install Poetry
@@ -72,7 +72,7 @@ jobs:
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
-          poetry run pytest --cov=app shop/tests --cov-report=xml
+          poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
       
       # Coverage 결과를 아티펙트로 저장
       - name: Save coverage report
@@ -94,6 +94,4 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.sources=.
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.coverageReportPaths=coverage.xml
