@@ -73,14 +73,6 @@ jobs:
         if: github.ref == 'refs/heads/shop-dev'
         run: |
           poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
-      
-      # Coverage 결과를 아티펙트로 저장
-      - name: Save coverage report
-        if: github.ref == 'refs/heads/shop-dev'
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: coverage.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실분
       - name: Run SonarCloud Scan
@@ -91,7 +83,6 @@ jobs:
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
         with:
           args: >
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.sources=.
             -Dsonar.coverageReportPaths=coverage.xml
