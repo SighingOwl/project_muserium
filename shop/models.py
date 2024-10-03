@@ -2,6 +2,9 @@ from django.db import models
 from accounts.models import User
 
 class Product(models.Model):
+    class Meta:
+        app_label = 'shop'
+
     # Product model
     title = models.CharField(max_length=127)
     short_description = models.CharField(max_length=50)

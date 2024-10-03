@@ -1,8 +1,8 @@
 import pytest
 from rest_framework.test import APIClient
 from django.urls import reverse
-from .models import Card, Carousel
-from .serializers import CardSerializer, CarouselSerializer
+from ..models import Card, Carousel
+from ..serializers import CardSerializer, CarouselSerializer
 
 @pytest.fixture
 def api_client():
