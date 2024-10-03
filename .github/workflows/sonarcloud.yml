@@ -74,6 +74,15 @@ jobs:
         run: |
           poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
 
+      # Coverage 파일 유효성 검사
+      - name: Validate Coverage File
+        run: |
+          if [ -f coverage.xml ]; then
+            xmlint --noout coverage.xml
+          else
+            echo "Coverage file not found, skipping validation"
+          fi
+
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실분
       - name: Run SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v3.0.0
