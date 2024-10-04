@@ -74,8 +74,8 @@ jobs:
         run: |
           poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
           ls -al
-          ls .coverage -al
-          grep coverage.xml -r .
+          ls .coverage
+          cat coverage.xml
 
       # Coverage 파일 유효성 검사
       - name: Validate Coverage File
