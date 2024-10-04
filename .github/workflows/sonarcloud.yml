@@ -74,6 +74,7 @@ jobs:
         run: |
           poetry run pytest --cov=shop shop/tests --cov-report=xml:coverage.xml
           poetry run pytest --cov=shop shop/tests
+          cat coverage.xml
 
       # Coverage 파일 유효성 검사
       - name: Install libxml2
@@ -100,5 +101,5 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=shop, main_page, glass_class, accounts, common
+            -Dsonar.sources=shop
 
