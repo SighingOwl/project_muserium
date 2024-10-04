@@ -77,7 +77,7 @@ jobs:
       # Coverage 파일 유효성 검사
       - name: Validate Coverage File
         run: |
-          if [ -f coverage.xml ]; then
+          if [ -f /github/workspace/coverage.xml ]; then
             xmlint --noout coverage.xml
           else
             echo "Coverage file not found, skipping validation"
