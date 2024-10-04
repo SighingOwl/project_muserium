@@ -74,13 +74,13 @@ jobs:
         run: |
           poetry run pytest --cov=app shop/tests --cov-report=xml
           ls -al
-          cat coverage.xml
+          cat .coverage
 
       # Coverage 파일 유효성 검사
       - name: Validate Coverage File
         run: |
-          if [ -f /github/workspace/coverage.xml ]; then
-            xmlint --noout /github/workspace/coverage.xml
+          if [ -f .coverage ]; then
+            xmlint --noout .coverage
           else
             echo "Coverage file not found, skipping validation"
           fi
