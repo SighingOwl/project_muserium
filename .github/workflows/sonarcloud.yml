@@ -78,7 +78,7 @@ jobs:
       - name: Validate Coverage File
         run: |
           if [ -f /github/workspace/coverage.xml ]; then
-            xmlint --noout coverage.xml
+            xmlint --noout /github/workspace/coverage.xml
           else
             echo "Coverage file not found, skipping validation"
           fi
