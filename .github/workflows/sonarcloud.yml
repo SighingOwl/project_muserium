@@ -72,9 +72,7 @@ jobs:
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
-          poetry run pytest --cov=shop shop/tests --cov-report=xml
-          ls -al
-          cat .coverage
+          poetry run pytest --cov=shop shop/tests --cov-report=cobertura:coverage.xml
 
       # Coverage 파일 유효성 검사
       - name: Install libxml2
