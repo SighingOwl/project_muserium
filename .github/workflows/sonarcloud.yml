@@ -85,7 +85,7 @@ jobs:
       - name: Validate Coverage File
         run: |
           if [ -f .coverage ]; then
-            xmlint --noout .coverage
+            xmllint --noout .coverage
           else
             echo "Coverage file not found, skipping validation"
           fi
