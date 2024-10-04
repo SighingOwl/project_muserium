@@ -72,9 +72,8 @@ jobs:
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
-          poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
+          poetry run pytest --cov=app shop/tests --cov-report=xml
           ls -al
-          ls .coverage
           cat coverage.xml
 
       # Coverage 파일 유효성 검사
