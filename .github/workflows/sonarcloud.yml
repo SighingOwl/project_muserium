@@ -73,6 +73,8 @@ jobs:
         if: github.ref == 'refs/heads/shop-dev'
         run: |
           poetry run pytest --cov=app shop/tests --cov-report=xml:coverage.xml
+          ls -al
+          cat coverage.xml
 
       # Coverage 파일 유효성 검사
       - name: Validate Coverage File
