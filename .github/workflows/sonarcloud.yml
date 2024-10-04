@@ -85,6 +85,7 @@ jobs:
         run: |
           if [ -f coverage.xml ]; then
             xmllint --noout coverage.xml
+            cat coverage.xml
           else
             echo "Coverage file not found, skipping validation"
           fi
