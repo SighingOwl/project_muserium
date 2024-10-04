@@ -101,6 +101,6 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=shop/
+            -Dsonar.sources=/home/runner/work/project_muserium/project_muserium/shop
             -Dsonar.python.coverage.reportPaths=coverage.xml
 
