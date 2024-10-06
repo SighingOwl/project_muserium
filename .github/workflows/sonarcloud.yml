@@ -68,7 +68,11 @@ jobs:
         run: |
           poetry install --no-root
 
-      # pytest를 사용해 push되는 브렌치별로 개발 중인 앱의 테스트를 실행하고 결과를 SonarCloud에 제공
+      # pytest를 사용해 push되는 브렌치별로 개발 중인 앱의 테스트를 실행 및 커버리지 파일 생성
+      - name: Create Coverage Directory
+        run: |
+          mkdir -p coverage
+
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
@@ -87,6 +91,6 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=shop
+            -Dsonar.sources=$(pwd)/shop
             -Dsonar.python.coverage.reportPaths=coverage_shop.xml
 
