@@ -71,14 +71,14 @@ jobs:
       # pytest를 사용해 push되는 브렌치별로 개발 중인 앱의 테스트를 실행 및 커버리지 파일 생성
       - name: Create Coverage Directory
         run: |
-          mkdir -p coverage
+          mkdir -p coverages
 
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
-          poetry run pytest --cov=shop shop/tests --cov-report=xml:coverage_shop.xml
+          poetry run pytest --cov=shop shop/tests --cov-report=xml:coverages/coverage_shop.xml
           poetry run pytest --cov=shop shop/tests
-          cat coverage_shop.xml
+          cat coverages/coverage_shop.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
       - name: Run SonarCloud Scan for shop-dev
@@ -91,6 +91,7 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=$(pwd)/shop
-            -Dsonar.python.coverage.reportPaths=coverage_shop.xml
+            -Dsonar.working.directory=/home/runner/work/project_***/project_***
+            -Dsonar.sources=shop
+            -Dsonar.python.coverage.reportPaths=coverages/coverage_shop.xml
 
