@@ -72,27 +72,13 @@ jobs:
       - name: Run Pytest on shop-dev branch
         if: github.ref == 'refs/heads/shop-dev'
         run: |
-          poetry run pytest --cov=shop shop/tests --cov-report=xml:coverage.xml
+          poetry run pytest --cov=shop shop/tests --cov-report=xml:coverage_shop.xml
           poetry run pytest --cov=shop shop/tests
-          cat coverage.xml
-
-      # Coverage 파일 유효성 검사
-      - name: Install libxml2
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxml2-utils
-      
-      - name: Validate Coverage File
-        run: |
-          if [ -f coverage.xml ]; then
-            xmllint --noout coverage.xml
-            cat coverage.xml
-          else
-            echo "Coverage file not found, skipping validation"
-          fi
+          cat coverage_shop.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
       - name: Run SonarCloud Scan for shop-dev
+        if: github.ref == 'refs/heads/shop-dev'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -102,5 +88,5 @@ jobs:
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.sources=shop
-            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.python.coverage.reportPaths=coverage_shop.xml
 
