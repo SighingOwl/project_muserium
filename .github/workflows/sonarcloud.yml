@@ -78,6 +78,7 @@ jobs:
         run: |
           poetry run pytest --cov=shop shop/tests --cov-report=xml:coverages/coverage_shop.xml
           poetry run pytest --cov=shop shop/tests
+          sed -i 's|/home/runner/work|<source>/github/workspace</source>|g' coverages/coverage_shop.xml
           cat coverages/coverage_shop.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
@@ -91,7 +92,6 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.working.directory=/home/runner/work/project_***/project_***
             -Dsonar.sources=shop
             -Dsonar.python.coverage.reportPaths=coverages/coverage_shop.xml
 
