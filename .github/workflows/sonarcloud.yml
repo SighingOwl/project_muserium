@@ -26,11 +26,11 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       # Poetry와 SonarCloud를 사용하기 위해 캐시를 설정
       - name: Cache Poetry and Virtualenv
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ${{ env.POETRY_CACHE_DIR }}
@@ -40,7 +40,7 @@ jobs:
             ${{ runner.os }}-poetry-
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
@@ -70,32 +70,32 @@ jobs:
           mkdir -p coverages
 
       - name: Run Pytest on main-page-dev branch
-        if: github.ref == 'refs/heads/main-page-dev'
+        if: github.head_ref == 'refs/heads/main-page-dev'
         run: |
           poetry run pytest --cov=main_page main_page/tests --cov-report=xml:coverages/coverage_main_page.xml
           sed -i 's|<source>.*</source>|<source>main_page</source>|g' coverages/coverage_main_page.xml
 
       - name: Run Pytest on class-dev branch
-        if: github.ref == 'refs/heads/class-dev'
+        if: github.head_ref == 'refs/heads/class-dev'
         run: |
           poetry run pytest --cov=class class/tests --cov-report=xml:coverages/coverage_class.xml
           sed -i 's|<source>.*</source>|<source>class</source>|g' coverages/coverage_class.xml
 
       - name: Run Pytest on user-dev branch
-        if: github.ref == 'refs/heads/user-dev'
+        if: github.head_ref == 'refs/heads/user-dev'
         run: |
-          poetry run pytest --cov=user user/tests --cov-report=xml:coverages/coverage_user.xml
-          sed -i 's|<source>.*</source>|<source>user</source>|g' coverages/coverage_user.xml
+          poetry run pytest --cov=accounts accounts/tests --cov-report=xml:coverages/coverage_accounts.xml
+          sed -i 's|<source>.*</source>|<source>accounts</source>|g' coverages/coverage_accounts.xml
 
       - name: Run Pytest on shop-dev branch
-        if: github.ref == 'refs/heads/shop-dev'
+        if: github.head_ref == 'refs/heads/shop-dev'
         run: |
           poetry run pytest --cov=shop shop/tests --cov-report=xml:coverages/coverage_shop.xml
           sed -i 's|<source>.*</source>|<source>shop</source>|g' coverages/coverage_shop.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
       - name: Run SonarCloud Scan for main-page-dev
-        if: github.ref == 'refs/heads/main-page-dev'
+        if: github.head_ref == 'refs/heads/main-page-dev'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
             -Dsonar.python.coverage.reportPaths=coverages/coverage_main_page.xml
       
       - name: Run SonarCloud Scan for class-dev
-        if: github.ref == 'refs/heads/class-dev'
+        if: github.head_ref == 'refs/heads/class-dev'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -117,11 +117,11 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=class
+            -Dsonar.sources=glass_class
             -Dsonar.python.coverage.reportPaths=coverages/coverage_class.xml
 
       - name: Run SonarCloud Scan for user-dev
-        if: github.ref == 'refs/heads/user-dev'
+        if: github.head_ref == 'refs/heads/user-dev'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -130,11 +130,11 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=user
-            -Dsonar.python.coverage.reportPaths=coverages/coverage_user.xml
+            -Dsonar.sources=accounts
+            -Dsonar.python.coverage.reportPaths=coverages/coverage_accounts.xml
 
       - name: Run SonarCloud Scan for shop-dev
-        if: github.ref == 'refs/heads/shop-dev'
+        if: github.head_ref == 'refs/heads/shop-dev'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
