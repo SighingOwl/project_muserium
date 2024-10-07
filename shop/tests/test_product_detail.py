@@ -19,7 +19,7 @@ def create_product(db):
         short_description="Short description 1",
         price=100,
         discount_rate=10,
-        image_url="http://example.com/image1.jpg",
+        image_url="https://example.com/image1.jpg",
         image_alt="Image 1",
         likes=10,
         reviews=5,
