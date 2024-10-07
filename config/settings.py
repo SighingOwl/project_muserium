@@ -38,6 +38,10 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    # asgi server
+    'channels',
+
+    # Django Default Apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -61,18 +65,24 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.naver',
+    
+    # django unittest
+    'pytest',
 
     # CORS
     'corsheaders',
+
     # Muserium Apps
     'accounts',
     'common',
     'main_page',
     'glass_class',
+    'shop',
 
 ]
 
 MIDDLEWARE = [
+    # django default middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,7 +90,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # cors middleware
     'corsheaders.middleware.CorsMiddleware',
+
+    # allauth middleware
     'allauth.account.middleware.AccountMiddleware',
 ]
 
@@ -143,12 +157,7 @@ CSRF_COOKIE_SECURE = True
 
 # CORS Configuration
 CORS_ALLOW_CREDENTIALS = True
-CORS_ORIGIN_ALLOW_ALL = False
-CORS_ORIGIN_WHITELIST = (
-    # VUE Frontend Port
-    'https://localhost:5173',    
-    'https://127.0.0.1:5173',    
-)
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'Authorization',
     'current_password',
@@ -210,9 +219,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ko-kr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
 
