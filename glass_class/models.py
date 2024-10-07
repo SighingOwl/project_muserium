@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.contrib.auth.models import User
 
 class GlassClass(models.Model):
@@ -29,7 +30,7 @@ class Reservation(models.Model):
         ('rejected', 'Rejected'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE)
     reservation_date = models.DateField()
     reservation_time = models.TimeField()
