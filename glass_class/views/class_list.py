@@ -2,8 +2,9 @@ from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
-from ..models import GlassClass
-from ..serializers import ClassSerializer
+from rest_framework.permissions import AllowAny
+from glass_class.models import GlassClass
+from glass_class.serializers import ClassSerializer
 
 class PaginationConfig(PageNumberPagination):
     page_size = 5
@@ -17,6 +18,7 @@ class PaginationConfig(PageNumberPagination):
         return (self.page.paginator.count + page_size - 1) // page_size
 
 class ClassListViewSets(viewsets.ModelViewSet):
+    permission_classes = (AllowAny,)
     queryset = GlassClass.objects.all()
     serializer_class = ClassSerializer
     pagination_class = PaginationConfig
@@ -53,4 +55,4 @@ class ClassListViewSets(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset()).order_by(sort_by)[:4]
 
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
