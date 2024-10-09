@@ -1,9 +1,9 @@
-name: CI Pipeling
+name: CI Pipeline
 
 on:
   pull_request:
     branches:
-      - class-dev
+      - "**"
 
 permissions:
   contents: read
