@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from ..models import GlassClass, Product, User, Like
+from common.models import GlassClass, Product, User, Like
 
 class LikeViewSets(viewsets.ViewSet):
     queryset = Like.objects.all()
@@ -19,18 +19,16 @@ class LikeViewSets(viewsets.ViewSet):
         
         class_id = request.query_params.get('class_id', None)
         if not class_id:
-            print('class_id가 필요합니다.')
             return Response({'error': 'class_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
         is_like = request.data.get('is_like', False)
 
-        user = get_object_or_404(User, pk=request.user)
         glass_class = get_object_or_404(GlassClass, pk=class_id)
 
         # 사용자가 좋아요를 누른 여부에 따라 좋아요 수를 증가하가나 감소
         if is_like:
             like = Like(
-                user=user,
+                user=request.user,
                 glass_class=glass_class,
                 created_at=timezone.now()
             )
@@ -41,7 +39,7 @@ class LikeViewSets(viewsets.ViewSet):
             return Response({'message': glass_class.title + '의 좋아요가 1 증가되었습니다.'}, status=status.HTTP_200_OK)
         else:
             like = self.queryset.filter(
-                user=user,
+                user=request.user,
                 glass_class=glass_class
             )
             like.delete()
@@ -60,9 +58,8 @@ class LikeViewSets(viewsets.ViewSet):
         if not request.user:
             return Response({'is_like': False}, status=status.HTTP_200_OK)
 
-        user = get_object_or_404(User, pk=request.user)
         glass_class = get_object_or_404(GlassClass, pk=class_id)
-        is_like = self.queryset.filter(user=user, glass_class=glass_class).exists()
+        is_like = self.queryset.filter(user=request.user, glass_class=glass_class).exists()
 
         return Response({'is_like': is_like}, status=status.HTTP_200_OK)
     
@@ -78,13 +75,12 @@ class LikeViewSets(viewsets.ViewSet):
             return Response({'error': 'product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
         is_like = request.data.get('is_like', False)
 
-        user = get_object_or_404(User, pk=request.user.id)
         product = get_object_or_404(Product, pk=product_id)
 
         # 사용자가 좋아요를 누른 여부에 따라 좋아요 수를 증가하가나 감소
         if is_like:
             like = Like(
-                user=user,
+                user=request.user,
                 product=product,
                 created_at=timezone.now()
             )
@@ -96,7 +92,7 @@ class LikeViewSets(viewsets.ViewSet):
             return Response({'message': product.title + '의 좋아요가 1 증가되었습니다.'}, status=status.HTTP_200_OK)
         else:
             like = self.queryset.filter(
-                user=user,
+                user=request.user,
                 product=product
             )
             like.delete()
@@ -116,8 +112,7 @@ class LikeViewSets(viewsets.ViewSet):
         if not request.user:
             return Response({'is_liked': False}, status=status.HTTP_200_OK)
 
-        user = get_object_or_404(User, pk=request.user.id)
         product = get_object_or_404(Product, pk=product_id)
-        is_liked = self.queryset.filter(user=user, product=product).exists()
+        is_liked = self.queryset.filter(user=request.user, product=product).exists()
 
         return Response({'is_liked': is_liked}, status=status.HTTP_200_OK)

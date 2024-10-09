@@ -1,3 +1,4 @@
+import os
 import boto3
 from rest_framework import viewsets, status
 from rest_framework.response import Response
@@ -8,9 +9,9 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils.html import escape
 from django.utils import timezone
-from ..models import GlassClass, Product, Review, User
-from ..forms import ReviewForm
-from ..serializers import ReviewSerializer
+from common.models import GlassClass, Product, Review, User
+from common.forms import ReviewForm
+from common.serializers import ReviewSerializer
 from .common import mask_username
 
 
@@ -70,16 +71,24 @@ class ReviewViewSets(viewsets.ViewSet):
                 product.average_rating = round(product.total_rating / product.reviews, 1)
                 product.save()
 
-            review.save()
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
             
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image.name}')
                 review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
                 review.save()
+
+            review.save()
 
             return Response({'message': '리뷰가 성공적으로 등록되었습니다.'}, status=status.HTTP_201_CREATED)
         else:
@@ -139,8 +148,8 @@ class ReviewViewSets(viewsets.ViewSet):
         review = get_object_or_404(self.queryset, pk=review_id)
         
         # Author check
-        if request.user != review.author and request.user != User.objects.get(is_superuser=True):
-            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user != review.author:
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         form = ReviewForm(request.POST, request.FILES, instance=review)
         if form.is_valid():
@@ -158,9 +167,17 @@ class ReviewViewSets(viewsets.ViewSet):
 
             review = form.save(commit=False)
             
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Update review image to S3
             if 'image' in request.FILES:
                 image_file = request.FILES['image']
+                if not is_valid_image_extension(image_file):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_review.image:
@@ -200,7 +217,7 @@ class ReviewViewSets(viewsets.ViewSet):
 
         # Author check
         if request.user != review.author and request.user != User.objects.get(is_superuser=True):
-            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Delete review image from S3
         if review.image:
@@ -214,12 +231,12 @@ class ReviewViewSets(viewsets.ViewSet):
         if glass_class:
             glass_class.reviews -= 1
             glass_class.total_rating -= review.rating
-            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1) if glass_class.reviews != 0 else 0
             glass_class.save()
         elif product:
             product.reviews -= 1
             product.total_rating -= review.rating
-            product.average_rating = round(product.total_rating / product.reviews, 1)
+            product.average_rating = round(product.total_rating / product.reviews, 1) if product.reviews != 0 else 0
             product.save()
         
         review.delete()

@@ -3,7 +3,7 @@ name: CI Pipeline
 on:
   push:
     branches:
-      - shop-dev
+      - common-dev
   pull_request:
     branches:
       - main
@@ -22,7 +22,7 @@ env:
   POETRY_CACHE_DIR: '~/.cache/pypoetry'
 
 jobs:
-  code_test_and_analysis-shop-dev:
+  code_test_and_analysis-class-dev:
     name: Code Test and Analysis
     runs-on: ubuntu-latest
 
@@ -71,13 +71,13 @@ jobs:
         run: |
           mkdir -p coverages
 
-      - name: Run Pytest on shop-dev branch
+      - name: Run Pytest on class-dev branch
         run: |
-          poetry run pytest --cov=shop shop/tests --cov-report=xml:coverages/coverage_shop.xml
-          sed -i 's|<source>.*</source>|<source>shop</source>|g' coverages/coverage_shop.xml
+          SECURE_SSL_REDIRECT=False poetry run pytest --cov=common common/tests --cov-report=xml:coverages/coverage_common.xml
+          sed -i 's|<source>.*</source>|<source>common</source>|g' coverages/coverage_common.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
-      - name: Run SonarCloud Scan for shop-dev
+      - name: Run SonarCloud Scan for class-dev
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -86,5 +86,5 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.sources=shop
-            -Dsonar.python.coverage.reportPaths=coverages/coverage_shop.xml
+            -Dsonar.sources=common
+            -Dsonar.python.coverage.reportPaths=coverages/coverage_common.xml

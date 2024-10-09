@@ -9,25 +9,33 @@ from shop.models import Product
 from accounts.models import User
 
 class TimeStampedModel(models.Model):
+    class Meta:
+        app_label = 'common'
+        abstract = True
+
     created_at = models.DateTimeField()
     modified_at = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
-        abstract = True
 
 class ContentModel(TimeStampedModel):
-    # Content model
+    class Meta:
+        app_label = 'common'
+        abstract = True
 
+    # Content model
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     content = models.TextField(max_length=500)
     image = models.URLField(max_length=255, null=True, blank=True)
 
-    class Meta:
-        abstract = True
-
+    
 class DetailInfo(TimeStampedModel):
-    # Detail info model
+    class Meta:
+        app_label = 'common'
 
+    def __str__(self):
+        return self.description_1[:50]
+
+    # Detail info model
     title = models.CharField(max_length=100, blank=True, null=True)
     description_1 = models.TextField(blank=True, null=True)
     description_2 = models.TextField(blank=True, null=True)
@@ -38,22 +46,22 @@ class DetailInfo(TimeStampedModel):
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
 
-    def __str__(self):
-        return self.description_1[:50]
 
 class Like(TimeStampedModel):
-    # Like model
+    class Meta:
+        app_label = 'common'
+        unique_together = ('user', 'glass_class')
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    # Like model
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     glass_class = models.ForeignKey(GlassClass, on_delete=models.CASCADE, null=True, blank=True)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
 
-    class Meta:
-        unique_together = ('user', 'glass_class')
-
 class Review(ContentModel):
-    # Review model
+    class Meta:
+        app_label = 'common'
 
+    # Review model
     rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)], default=1)
     '''
     sub_rating_1: teacher rating or product quality rating
@@ -67,8 +75,10 @@ class Review(ContentModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
 
 class Question(ContentModel):
-    # QnA model
+    class Meta:
+        app_label = 'common'
 
+    # QnA model
     title = models.CharField(max_length=100)
     is_secret = models.BooleanField(default=False)
     view_count = models.IntegerField(default=0)
@@ -77,13 +87,17 @@ class Question(ContentModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
 
 class Answer(ContentModel):
-    # Answer model
+    class Meta:
+        app_label = 'common'
 
+    # Answer model
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
 
-class Comment(ContentModel):
-    # Comment model
+class Comment(ContentModel):    
+    class Meta:
+        app_label = 'common'
 
+    # Comment model
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')

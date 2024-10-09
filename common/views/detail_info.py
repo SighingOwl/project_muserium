@@ -1,3 +1,4 @@
+import os
 import boto3
 from django.conf import settings
 from django.shortcuts import get_object_or_404
@@ -6,9 +7,9 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from ..models import GlassClass, Product, DetailInfo
-from ..serializers import DetailInfoSerializer
-from ..forms import DetailInfoForm
+from common.models import GlassClass, Product, DetailInfo
+from common.serializers import DetailInfoSerializer
+from common.forms import DetailInfoForm
 
 # 리소스 누수를 방지하기 위한 전역적으로 boto3 클라이언트 생성
 s3_client = boto3.client(
@@ -57,7 +58,7 @@ class DetailInfoViewSets(viewsets.ViewSet):
     
         # Only admin can update detail info
         if not request.user.is_superuser:
-            return Response({'error': '권한이 없습니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '권한이 없습니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         # Check if detail_info_id exists
         detail_info_id = request.query_params.get('detail_info_id', None)
@@ -75,20 +76,35 @@ class DetailInfoViewSets(viewsets.ViewSet):
             def upload_to_s3(file, path):
                 s3_client.upload_fileobj(file, settings.AWS_STORAGE_BUCKET_NAME, path)
                 return f'{settings.AWS_S3_CUSTOM_DOMAIN}/{path}'
+            
+            # Function to check if file extension is valid
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
     
             # Upload review image to S3
             if 'product_image' in request.FILES:
                 image = request.FILES['product_image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'product_image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 detail_info.product_image = upload_to_s3(image, f'detail/{detail_info.id}/product/{image.name}')
             
             if 'notice_image' in request.FILES:
                 image = request.FILES['notice_image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'notice_image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 detail_info.notice_image = upload_to_s3(image, f'detail/{detail_info.id}/notice/{image.name}')
             else:
                 detail_info.notice_image = None
     
             if 'event_image' in request.FILES:
                 image = request.FILES['event_image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'event_image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 detail_info.event_image = upload_to_s3(image, f'detail/{detail_info.id}/event/{image.name}')
             else:
                 detail_info.event_image = None

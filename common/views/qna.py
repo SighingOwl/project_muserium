@@ -1,3 +1,4 @@
+import os
 import boto3
 from rest_framework import viewsets, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -9,9 +10,9 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from ..models import GlassClass, Product, Question, Answer, User
-from ..forms import QuestionForm, AnswerForm
-from ..serializers import QuestionListSerializer, QuestionSerializer, AnswerSerializer
+from common.models import GlassClass, Product, Question, Answer, User
+from common.forms import QuestionForm, AnswerForm
+from common.serializers import QuestionListSerializer, QuestionSerializer, AnswerSerializer
 from .common import mask_username
 
 # 리소스 누수를 방지하기 위한 전역적으로 boto3 클라이언트 생성
@@ -53,7 +54,7 @@ class QuestionViewSets(viewsets.ViewSet):
         if not class_id and not product_id:
             return Response({'error': 'class_id 또는 product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        form = QuestionForm(request.data)
+        form = QuestionForm(request.POST, request.FILES)
         if form.is_valid():
             question = form.save(commit=False)
             question.author = request.user
@@ -71,9 +72,18 @@ class QuestionViewSets(viewsets.ViewSet):
 
             question.save()
 
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
                 question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
@@ -159,7 +169,7 @@ class QuestionViewSets(viewsets.ViewSet):
 
         # Author check
         if request.user != question.author:
-            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Content Update
         form = QuestionForm(request.POST, request.FILES, instance=question)
@@ -169,9 +179,17 @@ class QuestionViewSets(viewsets.ViewSet):
             question = form.save(commit=False)
             question.modified_at = timezone.now()
 
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_question.image:
@@ -220,7 +238,7 @@ class QuestionViewSets(viewsets.ViewSet):
 
             return Response({'message': '질문이 성공적으로 삭제되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def increase_question_view_count(self, request, *args, **kwargs):
@@ -266,7 +284,7 @@ class AnswerViewSets(viewsets.ViewSet):
 
         # Only admin can create an answer
         if request.user != User.objects.get(is_superuser=True):
-            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         question_id = request.query_params.get('question_id')
         if not question_id:
@@ -286,9 +304,18 @@ class AnswerViewSets(viewsets.ViewSet):
             answer.question = question
             answer.save()
 
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
                 answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{question.id}/{answer.id}/{image.name}'
@@ -308,7 +335,7 @@ class AnswerViewSets(viewsets.ViewSet):
 
         # Only admin can update an answer
         if request.user != User.objects.get(is_superuser=True):
-            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         answer_id = request.query_params.get('answer_id')
         if not answer_id:
@@ -322,10 +349,18 @@ class AnswerViewSets(viewsets.ViewSet):
 
             answer = form.save(commit=False)
             answer.modified_at = timezone.now()
+            
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
 
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_answer.image:
@@ -348,7 +383,7 @@ class AnswerViewSets(viewsets.ViewSet):
 
         # Only admin can delete an answer
         if request.user != User.objects.get(is_superuser=True):
-            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
         answer_id = request.query_params.get('answer_id')
         if not answer_id:
