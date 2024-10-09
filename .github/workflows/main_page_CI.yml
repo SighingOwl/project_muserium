@@ -72,14 +72,12 @@ jobs:
           mkdir -p coverages
 
       - name: Run Pytest on main-page-dev branch
-        if: github.head_ref == 'main-page-dev' || github.head_ref == 'main-page-dev' && github.base_ref == 'test-merge'
         run: |
           poetry run pytest --cov=main_page main_page/tests --cov-report=xml:coverages/coverage_main_page.xml
           sed -i 's|<source>.*</source>|<source>main_page</source>|g' coverages/coverage_main_page.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
       - name: Run SonarCloud Scan for main-page-dev
-        if: github.head_ref == 'main-page-dev' || github.head_ref == 'main-page-dev' && github.base_ref == 'test-merge'
         uses: SonarSource/sonarcloud-github-action@v3.0.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

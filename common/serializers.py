@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import DetailInfo, Review, Question, Answer, Comment
+from common.models import DetailInfo, Review, Question, Answer, Comment
 
 class DetailInfoSerializer(serializers.ModelSerializer):
     # Detail info serializer
