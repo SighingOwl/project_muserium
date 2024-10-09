@@ -3,7 +3,8 @@ name: CI Pipeline
 on:
   pull_request:
     branches:
-      - "user-dev"
+      - main
+      - test-merge
 
 permissions:
   contents: read
