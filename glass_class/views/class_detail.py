@@ -1,12 +1,13 @@
 from rest_framework.response import Response
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
-from django.contrib.auth.models import User
-from ..models import GlassClass
-from ..serializers import ClassDetailSerializer
+from glass_class.models import GlassClass
+from glass_class.serializers import ClassDetailSerializer
 
 class ClassViewSets(viewsets.ModelViewSet):
+    permission_classes = (AllowAny,)
     queryset = GlassClass.objects.all()
     serializer_class = ClassDetailSerializer
 
@@ -16,6 +17,6 @@ class ClassViewSets(viewsets.ModelViewSet):
 
         pk = request.query_params.get('id', None)
 
-        selected_class = GlassClass.objects.get(pk=pk)
+        selected_class = get_object_or_404(GlassClass, pk=pk)
         serializer = self.get_serializer(selected_class)
         return Response(serializer.data)

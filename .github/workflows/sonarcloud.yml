@@ -78,7 +78,7 @@ jobs:
       - name: Run Pytest on class-dev branch
         if: github.head_ref == 'class-dev' || github.head_ref == 'class-dev' && github.base_ref == 'test-merge'
         run: |
-          poetry run pytest --cov=class class/tests --cov-report=xml:coverages/coverage_class.xml
+          SECURE_SSL_REDIRECT=False poetry run pytest --cov=class class/tests --cov-report=xml:coverages/coverage_class.xml
           sed -i 's|<source>.*</source>|<source>class</source>|g' coverages/coverage_class.xml
 
       - name: Run Pytest on user-dev branch
