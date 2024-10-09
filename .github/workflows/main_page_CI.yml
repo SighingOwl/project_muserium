@@ -3,7 +3,7 @@ name: CI Pipeling
 on:
   pull_request:
     branches:
-      - 'main-page-dev'
+      - main-page-dev
 
 permissions:
   contents: read
