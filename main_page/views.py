@@ -1,10 +1,13 @@
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .models import Card, Carousel
 from .serializers import CardSerializer, CarouselSerializer
 
 class CarouselListViewSets(ModelViewSet):
+    permission_classes = (AllowAny,)
+
     queryset = Carousel.objects.all()
     serializer_class = CarouselSerializer
 
@@ -18,6 +21,8 @@ class CarouselListViewSets(ModelViewSet):
         return Response(serializer.data)
 
 class CardListViewSets(ModelViewSet):
+    permission_classes = (AllowAny,)
+
     queryset = Card.objects.all()
     serializer_class = CardSerializer
 

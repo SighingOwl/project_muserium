@@ -22,34 +22,6 @@ import certifi
 main_domain = settings.MAIN_DOMAIN
 frontend_domain = 'https://localhost:5173'
 
-class RegisterAPIView(APIView):
-    permission_classes = (AllowAny,)
-
-    def post(self, request, *args, **kwargs):
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-
-            token = TokenObtainPairSerializer().get_token(serializer.instance)
-            refresh_token = str(token)
-            access_token = str(token.access_token)
-
-            user = User.objects.get(email=serializer.data['email'])
-            
-            return Response({
-                "refresh": refresh_token,
-                "access": access_token,
-                "user": {
-                    "email": user.email,
-                    "name": user.name,
-                    "mobile": user.mobile,
-                }
-            }, status=status.HTTP_201_CREATED)
-        else:
-            return JsonResponse({
-                "error": serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
-
 class LoginAPIView(APIView):
     permission_classes = (AllowAny,)
 
@@ -86,29 +58,6 @@ class LoginAPIView(APIView):
                 "address_extra": user.address_extra,
             }
         }, status=status.HTTP_200_OK)
-
-class UpdateUserAPIView(APIView):
-    permission_classes = (IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        user = User.objects.get(email=request.data.get('email'))
-        
-        if request.headers.get('new_password', None) is not None:
-            if not user.check_password(request.headers.get('current_password')):
-                return Response({"error": "현재 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
-            user.set_password(request.headers.get('new_password'))
-        
-        if request.data.get('mobile', None) is not None:
-            user.mobile = request.data.get('mobile')
-        
-        if request.data.get('postcode', None) is not None:
-            user.postcode = request.data.get('postcode')
-            user.address = request.data.get('address')
-            user.address_detail = request.data.get('address_detail')
-            user.address_extra = request.data.get('address_extra', None)
-        
-        user.save()
-        return Response({"message": "정보가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
 
 class NaverLoginAPIView(APIView):
     # 로그인을 위한 창은 누구든 접속이 가능해야 하기 때문에 permission을 AllowAny로 설정
@@ -332,6 +281,66 @@ class LogoutAPIView(LogoutView):
         # django logout
         return super().post(request, *args, **kwargs)
 
+
+'''
+User Data API
+RegisterAPIView: 회원가입 API
+UpdateUserAPIView: 사용자 정보 변경 API
+CheckEmailAPIView: 이메일 중복 확인 API
+RestoreEmail: 이메일 찾기 API
+ResetPassword: 비밀번호 초기화 API
+'''
+class RegisterAPIView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request, *args, **kwargs):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+
+            token = TokenObtainPairSerializer().get_token(serializer.instance)
+            refresh_token = str(token)
+            access_token = str(token.access_token)
+
+            user = User.objects.get(email=serializer.data['email'])
+            
+            return Response({
+                "refresh": refresh_token,
+                "access": access_token,
+                "user": {
+                    "email": user.email,
+                    "name": user.name,
+                    "mobile": user.mobile,
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return JsonResponse({
+                "error": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+class UpdateUserAPIView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        user = User.objects.get(email=request.data.get('email'))
+        
+        if request.headers.get('new_password', None) is not None:
+            if not user.check_password(request.headers.get('current_password')):
+                return Response({"error": "현재 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            user.set_password(request.headers.get('new_password'))
+        
+        if request.data.get('mobile', None) is not None:
+            user.mobile = request.data.get('mobile')
+        
+        if request.data.get('postcode', None) is not None:
+            user.postcode = request.data.get('postcode')
+            user.address = request.data.get('address')
+            user.address_detail = request.data.get('address_detail')
+            user.address_extra = request.data.get('address_extra', None)
+        
+        user.save()
+        return Response({"message": "정보가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
+    
 class CheckEmailAPIView(APIView):
     permission_classes = (AllowAny,)
 
@@ -364,7 +373,7 @@ class RestoreEmail(APIView):
             return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
         
 class ResetPassword(APIView):
-    permission_classes = (AllowAny,)
+    permission_classes = [AllowAny,]
 
     def post(self, request, *args, **kwargs):
         email = request.data.get('email', None)
@@ -391,3 +400,9 @@ class ResetPassword(APIView):
         password = ''.join(random.choice(string.ascii_letters + string.digits) for i in range(8))
 
         return password
+    
+class IsAdmin(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        return Response({"is_admin": request.user.is_superuser}, status=status.HTTP_200_OK)

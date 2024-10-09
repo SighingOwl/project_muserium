@@ -1,11 +1,13 @@
 from rest_framework.response import Response
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_protect
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db import transaction
-from ..models import GlassClass, Reservation
-from ..serializers import ReservationSerializer
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from glass_class.models import GlassClass, Reservation
+from glass_class.serializers import ReservationSerializer
+from accounts.models import User
 from datetime import datetime, timedelta
 from collections import Counter
 
@@ -49,18 +51,16 @@ class DateConfig:
 
 class ClassReservationViewSets(viewsets.ModelViewSet):
     queryset = Reservation.objects.all()
-    serializer_class = ReservationSerializer
+    serializer_reservation = ReservationSerializer
 
     '''
     로그인 기능 추가 후 수정 필요
     '''
-    #@login_required(login_url='#')
-    @action(detail=False, methods=['post'])
-    @csrf_protect
-    @transaction.atomic
-    def create_reservation(self, request):
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    #@transaction.atomic
+    def create_reservation(self, request, *args, **kwargs):
         # Create a reservation
-
+        
         class_id = request.data.get('class_id', None)
         reservation_date = request.data.get('reservation_date', None)
         reservation_time = request.data.get('reservation_time', None)
@@ -76,20 +76,24 @@ class ClassReservationViewSets(viewsets.ModelViewSet):
         valid_times = date_config.vaild_times
         disabled_times = [reservation.reservation_time for reservation in Reservation.objects.filter(reservation_date=reservation_date)]
         
-        if reservation_date in disabled_dates:
+        if reservation_date in disabled_dates or reservation_date < date_config.get_start_date().strftime('%Y-%m-%d') or reservation_date > date_config.get_end_date().strftime('%Y-%m-%d'):
             return Response({'error': 'This date is not available for reservation'}, status=status.HTTP_400_BAD_REQUEST)
         if reservation_time not in valid_times or reservation_time in disabled_times:
             return Response({'error': 'This time is not available for reservation'}, status=status.HTTP_400_BAD_REQUEST)
 
-        glass_class = GlassClass.objects.get(id=class_id)
+        glass_class = get_object_or_404(GlassClass, pk=class_id)
         reservation_date = datetime.strptime(reservation_date, '%Y-%m-%d')
 
         # Check if the user has already made a reservation
-        # 유저별로 예약을 관리하는 모델이 필요... if Reservation.objects.filter(glass_class=glass_class, user = request.user, reservation_date=reservation_date).exists():
-        #     return Response({'error': 'You have already made a reservation for this class'}, status=status.HTTP_400_BAD_REQUEST)
+        # 유저별로 예약을 관리하는 모델이 필요...
+        if Reservation.objects.filter(glass_class=glass_class, user=request.user, reservation_date=reservation_date).exists():
+            return Response({'error': 'You have already made a reservation for this class'}, status=status.HTTP_400_BAD_REQUEST)
 
+        Reservation.objects.create(user=request.user, glass_class=glass_class, reservation_date=reservation_date, reservation_time=reservation_time, created_at=timezone.now())
+        return Response({'message': 'Reservation created successfully'}, status=status.HTTP_201_CREATED)
     
-    @action(detail=False, methods=['get'])
+
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def list_reservations(self, request):
         # List all reservations for a specific class
 
@@ -107,11 +111,10 @@ class ClassReservationViewSets(viewsets.ModelViewSet):
             glass_class=glass_class,
             reservation_date__range=[start_date, end_date]
         )
-        serializer = self.get_serializer(reservations, many=True)
-        return Response(serializer.data)
-    
+        serializer = self.serializer_reservation(reservations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def get_disabled_dates(self, request):
         # Get disabled dates for all reservations
         
@@ -125,9 +128,9 @@ class ClassReservationViewSets(viewsets.ModelViewSet):
 
         disabled_dates = date_config.get_disabled_dates(reservations)
 
-        return Response(disabled_dates)
+        return Response(disabled_dates, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
     def get_disabled_timezones(self, request):
         # Get disabled timezones for all reservations
 
@@ -139,12 +142,10 @@ class ClassReservationViewSets(viewsets.ModelViewSet):
         now = date_config.get_start_date()
         vaild_times = date_config.vaild_times
         threshold_time = now + timedelta(hours=1, minutes=30)
-
-        print(threshold_time)
         
         disabled_timezones = [reservation.reservation_time for reservation in Reservation.objects.filter(reservation_date=selected_date)]
         for time in vaild_times:
             if threshold_time.strftime('%H:%M:%S') > time and time not in disabled_timezones:
                 disabled_timezones.append(time)
         
-        return Response(disabled_timezones)
+        return Response(disabled_timezones, status=status.HTTP_200_OK)

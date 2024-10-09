@@ -1,16 +1,18 @@
+import os
 import boto3
+from rest_framework import viewsets, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
+
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
-from django.contrib.auth.models import User
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_POST
-from django.utils.html import escape
 from django.utils import timezone
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from ..models import Question, Answer
-from glass_class.models import GlassClass
-from ..forms import QuestionForm, AnswerForm
+
+from common.models import GlassClass, Product, Question, Answer, User
+from common.forms import QuestionForm, AnswerForm
+from common.serializers import QuestionListSerializer, QuestionSerializer, AnswerSerializer
 from .common import mask_username
 
 # 리소스 누수를 방지하기 위한 전역적으로 boto3 클라이언트 생성
@@ -21,202 +23,155 @@ s3_client = boto3.client(
     region_name=settings.AWS_S3_REGION_NAME
 )
 
-# Glass class Question
+# Pagination Config
+class PaginationConfig(PageNumberPagination):
+    page_size = 5
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def create_class_question(request):
-    # Create a Question
-    
-    if request.method == 'POST':
+    def get_total_pages(self):
+        if self.page.paginator.count == 0 or self.page_size == 0:
+            return 0
+        page_size = int(self.page_size)
+        return (self.page.paginator.count + page_size - 1) // page_size
 
-        glass_class_id = request.GET.get('glass_class_id')
-        if not glass_class_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'glass_class_id가 필요합니다.'
-            }, status=400)
+# Question ViewSets
+class QuestionViewSets(viewsets.ViewSet):
+    queryset = Question.objects.all()
+    serializer_list_question = QuestionListSerializer
+    serializer_question = QuestionSerializer
+    serializer_answer = AnswerSerializer
 
-        glass_class = get_object_or_404(GlassClass, pk=glass_class_id) 
+    pagination_class = PaginationConfig
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def create_question(self, request, *args, **kwargs):
+        # Create a Question
+
+        # Get the class_id or product_id
+        class_id = request.query_params.get('class_id')
+        product_id = request.query_params.get('product_id')
+        if not class_id and not product_id:
+            return Response({'error': 'class_id 또는 product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         form = QuestionForm(request.POST, request.FILES)
         if form.is_valid():
             question = form.save(commit=False)
-            question.author = User.objects.get(username='admin')  # 로그인 기능 추가 후 수정 필요
+            question.author = request.user
             question.created_at = timezone.now()
-            question.glass_class = glass_class
+
+            # Increase the question count of the class or product
+            if class_id:
+                question.glass_class = get_object_or_404(GlassClass, pk=class_id)
+                question.glass_class.questions += 1
+                question.glass_class.save()
+            elif product_id:
+                question.product = get_object_or_404(Product, pk=product_id)
+                question.product.questions += 1
+                question.product.save()
+
             question.save()
+
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
 
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
                 question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
+            
+                question.save()
 
-            question.save()
-
-            return JsonResponse({
-                'status': 'success',
-                'message': 'question created successfully',
-                'question': {
-                    'id': question.id,
-                    'title': escape(question.title),
-                    'author': escape(question.author.username),
-                    'content': escape(question.content),
-                    'image': escape(question.image),
-                    'is_secret': escape(question.is_secret),
-                    'glass_class': escape(question.glass_class.title) if question.glass_class else None,
-                    'created_at': escape(question.created_at),
-                    'modified_at': escape(question.modified_at) if question.modified_at else None
-                }
-            }, status=200)
+            return Response({'message': '질문이 성공적으로 등록되었습니다.'}, status=status.HTTP_201_CREATED)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    return JsonResponse({
-        'status': 'error',
-        'message': '부적절한 요청 메소드입니다.'
-        }, stauts=405)
-
-def read_class_question(request):
-    # Read a Question
-
-    if request.method == 'GET':
-
-        glass_class_id = request.GET.get('glass_class_id')
-        if not glass_class_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'glass_class_id가 필요합니다.'
-            }, status=400)
-
-        target_glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
-
-        # Pagination
-        page = request.GET.get('page', 1)
-        page_size = request.GET.get('page_size', 5)
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def read_question(self, request, *args, **kwargs):
+        # Read the Questions
 
         # Order by created_at by default
-        page_order = request.GET.get('page_order', '-created_at')
+        page_order = request.query_params.get('page_order', '-created_at')
         vaild_order_fields = ['-created_at', '-view_count']
         if page_order not in vaild_order_fields:
             page_order = '-created_at'
 
-        questions = Question.objects.filter(glass_class = target_glass_class).order_by(page_order, '-created_at')
+        # Get questions by class_id or product_id
+        class_id = request.query_params.get('class_id')
+        product_id = request.query_params.get('product_id')
+        if not class_id and not product_id:
+            return Response({'error': 'class_id 또는 product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        paginator = Paginator(questions, page_size)
+        # Get sorted questions
+        if class_id:
+            questions = self.queryset.filter(glass_class=class_id).order_by(page_order, '-created_at')
+        elif product_id:
+            questions = self.queryset.filter(product=product_id).order_by(page_order, '-created_at')
 
-        try:
-            question_list = paginator.page(page)
-        except PageNotAnInteger:
-            question_list = paginator.page(1)
-        except EmptyPage:
-            question_list = paginator.page(paginator.num_pages)
-        
-        question_data = []
-        for question in question_list:
-            answer_data = {}
-            if Answer.objects.filter(question=question).exists():
-                answer = Answer.objects.filter(question=question).first()
-                answer_data ={
-                    'id': answer.id,
-                    'answered_at': answer.created_at,
-                    'is_answered': True
-                }
+        # Pagination
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(questions, request, view=self)
+        if page is not None:
+            question_data = self.serializer_list_question(page, many=True).data
+            paginated_questions = paginator.get_paginated_response(question_data)
+            paginated_questions.data['total_pages'] = paginator.get_total_pages()
 
-            question_data.append({
-                'id': question.id,
-                'title': question.title,
-                'author': mask_username(question.author.username),
-                'is_secret': question.is_secret,
-                'view_count': question.view_count,
-                'created_at': question.created_at,
-                'modified_at': question.modified_at if question.modified_at else None,
-                'answer': answer_data
-            })
+            # Mask the username
+            for question in paginated_questions.data['results']:
+                author = User.objects.get(pk=question['author'])
+                question['author'] = mask_username(author.name)
+            
+            # Get the answer status
+            for question in paginated_questions.data['results']:
+                question['is_answered'] = True if Answer.objects.filter(question=question['id']).exists() else False
 
-        page_attrs = {
-            'count': paginator.count,
-            'per_page': page_size,
-            'page_range': list(paginator.page_range),
-            'current_page': question_list.number,
-            'previous_page': question_list.previous_page_number() if question_list.has_previous() else None,
-            'next_page': question_list.next_page_number() if question_list.has_next() else None,
-            'start_index': question_list.start_index(),
-            'end_index': question_list.end_index(),
-        }
-        return JsonResponse({
-            'status': 'success',
-            'questions': question_data,
-            'paginator': page_attrs
-        }, status=200)
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': '부적절한 요청 메소드입니다.'
-    }, status=405)
+            return Response({'questions': paginated_questions.data}, status=status.HTTP_200_OK)
+        else:
+            return Response({'message': '질문이 존재하지 않습니다.'}, status=status.HTTP_200_OK)
 
-def get_question_content(request):
-    # Get a Question content
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def get_question_content(self, request, *args, **kwargs):
+        # Get a Question content
 
-    if request.method == 'GET':
-        question_id = request.GET.get('question_id')
+        question_id = request.query_params.get('question_id')
         if not question_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'question_id가 필요합니다.'
-            }, status=400)
-
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         question = get_object_or_404(Question, pk=question_id)
         answer = Answer.objects.filter(question=question).first()
 
-        return JsonResponse({
-            'status': 'success',
-            'question': {
-                'id': question.id,
-                'content': question.content,
-                'image': question.image,
-                'answer_id': answer.id if answer else None,
-                'answer_content': answer.content if answer else '',
-                'answer_image': answer.image if answer else None
-            }
-        }, status=200)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+        # data serialization
+        question_data = self.serializer_question(question).data
+        answer_data = self.serializer_answer(answer).data if answer else None
 
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def update_class_question(request):
-    # update a Question
+        # Mask the username
+        author = User.objects.get(pk=question_data['author'])
+        question_data['author'] = mask_username(author.name)
 
-    question_id = request.GET.get('question_id')
-    if not question_id:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'question_id가 필요합니다.'
-        }, status=400)
+        return Response({'question': question_data, 'answer': answer_data}, status=status.HTTP_200_OK)
 
-    question = get_object_or_404(Question, pk=question_id)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_question(self, request, *args, **kwargs):
+        # Update a Question
 
-    '''
-    로그인 기능 추가 후 실행 예정
-    if request.user != question.author:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'You are not the author of this question'
-        }, status=403)
-    '''
-    if request.method == 'POST':
+        question_id = request.query_params.get('question_id')
+        if not question_id:
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        question = get_object_or_404(Question, pk=question_id)
+
+        # Author check
+        if request.user != question.author:
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Content Update
         form = QuestionForm(request.POST, request.FILES, instance=question)
         if form.is_valid():
             original_question = Question.objects.get(pk=question_id)
@@ -224,9 +179,17 @@ def update_class_question(request):
             question = form.save(commit=False)
             question.modified_at = timezone.now()
 
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_question.image:
@@ -236,62 +199,26 @@ def update_class_question(request):
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/questions/{question.id}/{image.name}')
                 question.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/questions/{question.id}/{image.name}'
-
+            
             question.save()
 
-            return JsonResponse({
-                'status': 'success',
-                'message': 'question updated successfully',
-                'question': {
-                    'id': escape(question.id),
-                    'title': escape(question.title),
-                    'author': escape(question.author.username),
-                    'content': escape(question.content),
-                    'image': escape(question.image),
-                    'is_secret': escape(question.is_secret),
-                    'glass_class': escape(question.glass_class.title),
-                    'created_at': escape(question.created_at),
-                    'modified_at': escape(question.modified_at)
-                }
-            }, status=200)
+            return Response({'message': '질문이 성공적으로 수정되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-#@login_required(login_url='#')
-@csrf_protect
-def delete_class_question(request):
-    # Delete a Question
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated])
+    def delete_question(self, request, *args, **kwargs):
+        # Delete a Question
 
-    if request.method == 'DELETE':
-
-        user_id = request.GET.get('user_id')
-        if not user_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'user_id가 필요합니다.'
-            }, status=400)
-
-        question_id = request.GET.get('question_id')
+        question_id = request.query_params.get('question_id')
         if not question_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'question_id가 필요합니다.'
-            }, status=400)
-
-        user = User.objects.get(pk=user_id)
-        question = get_object_or_404(Question, pk=question_id)
-        glass_class = question.glass_class
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if user == question.author or user == User.objects.get(username='admin'):
+        question = get_object_or_404(Question, pk=question_id)
+        target_content = question.glass_class if question.glass_class else question.product
+
+        # Author check
+        if request.user == question.author or request.user == User.objects.get(is_superuser=True):
             # Delete answer image from S3 before deleting the question
             if Answer.objects.filter(question=question).exists():
                 answer = Answer.objects.get(question=question)
@@ -306,181 +233,134 @@ def delete_class_question(request):
 
             question.delete()
 
-            glass_class.questions -= 1
-            glass_class.save()
+            target_content.questions -= 1
+            target_content.save()
 
-            return JsonResponse({
-                'status': 'success',
-                'message': 'question deleted successfully'
-            }, status=200)
+            return Response({'message': '질문이 성공적으로 삭제되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '이 글의 작성자가 아닙니다.'
-            }, status=403)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
 
-@require_POST
-@csrf_protect
-def increase_question_view_count(request):
-    # Increase Question view count
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def increase_question_view_count(self, request, *args, **kwargs):
+        # Increase Question view count
 
-    question_id = request.GET.get('question_id')
-    if not question_id:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'question_id가 필요합니다.'
-        }, status=400)
-    
-    question = get_object_or_404(Question, pk=question_id)
-
-    if request.method == 'POST':
-        try:
-            question.view_count += 1
-            question.save()
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': 'view count increased successfully',
-                'view_count': question.view_count
-            }, status=200)
-        except:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Failed to increase view count'
-            }, status=400)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-            }, status=405)
-
-# Glass class Answer for Question
-
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def create_class_answer(request):
-    # Create an answer
-
-    '''
-    로그인 기능 추가 후 실행 예정
-    # Only admin can create an answer
-
-    if request.user != User.objects.get(username='admin'):
-        return JsonResponse({
-            'status': 'error',
-            'message': 'You are not allowed to create an answer'
-        }, status=403)
-    '''
-    
-    if request.method == 'POST':
-        
-        question_id = request.GET.get('question_id')
+        question_id = request.query_params.get('question_id')
         if not question_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'question_id가 필요합니다.'
-            }, status=400)
-
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         question = get_object_or_404(Question, pk=question_id)
 
-        if Answer.objects.filter(question=question).exists():
-            return JsonResponse({
-                'status': 'error',
-                'message': '이미 답변된 질문입니다.'
-            }, status = 400)
+        question.view_count += 1
+        question.save()
 
+        return Response({'message': '조회수가 성공적으로 증가되었습니다.', 'view_count': question.view_count}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def is_author(self, request, *args, **kwargs):
+        # Check if the user is the author of the question
+
+        question_id = request.query_params.get('question_id')
+        if not question_id:
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        question = get_object_or_404(Question, pk=question_id)
+        author = question.author
+
+        if request.user == author:
+            return Response({'is_author': True}, status=status.HTTP_200_OK)
+        elif request.user == User.objects.get(is_superuser=True):
+            return Response({'is_author': 'Super'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'is_author': False}, status=status.HTTP_200_OK)
+
+# Answer ViewSets
+class AnswerViewSets(viewsets.ViewSet):
+    queryset = Answer.objects.all()
+    serializer_class = AnswerSerializer
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def create_answer(self, request, *args, **kwargs):
+        # Create An Answer
+
+        # Only admin can create an answer
+        if request.user != User.objects.get(is_superuser=True):
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        question_id = request.query_params.get('question_id')
+        if not question_id:
+            return Response({'error': 'question_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        question = get_object_or_404(Question, pk=question_id)
+
+        # Check if the question is already answered
+        if question.answered_at:
+            return Response({'error': '이미 답변된 질문입니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         form = AnswerForm(request.POST, request.FILES)
         if form.is_valid():
             answer = form.save(commit=False)
-            answer.author = User.objects.get(username='admin')
+            answer.author = User.objects.get(is_superuser=True)
             answer.created_at = timezone.now()
             answer.question = question
             answer.save()
 
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
+
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
-                try:
-                    # Upload the new image
-                    s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
-                    answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{question.id}/{answer.id}/{image.name}'
-                except:
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': '이미지 업로드에 실패했습니다.'
-                    }, status=400)
-
+                # Upload the new image
+                s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{question.id}/{answer.id}/{image.name}')
+                answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{question.id}/{answer.id}/{image.name}'
+            
             answer.save()
 
-            return JsonResponse({
-                'status': 'success',
-                'message': 'answer created successfully',
-                'answer': {
-                    'id': answer.id,
-                    'author': escape(answer.author.username),
-                    'content': escape(answer.content),
-                    'question': escape(answer.question.title),
-                    'created_at': escape(answer.created_at),
-                    'modified_at': escape(answer.modified_at) if answer.modified_at else None
-                }
-            }, status=200)
+            question.answered_at = timezone.now()
+            question.save()
+
+            return Response({'message': '답변이 성공적으로 등록되었습니다.'}, status=status.HTTP_201_CREATED)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def update_class_answer(request):
-    # Update an answer
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_answer(self, request, *args, **kwargs):
+        # Update an Answer
 
-    '''
-    로그인 기능 추가 후 실행 예정
-    # Only admin can update an answer
-
-    if request.user != User.objects.get(username='admin'):
-        return JsonResponse({
-            'status': 'error',
-            'message': 'You are not allowed to update an answer'
-        }, status=403)
-    '''
-
-    if request.method == 'POST':
-
-        answer_id = request.GET.get('answer_id')
-        if not answer_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'answer_id가 필요합니다.'
-            }, status=400)
+        # Only admin can update an answer
+        if request.user != User.objects.get(is_superuser=True):
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
         
+        answer_id = request.query_params.get('answer_id')
+        if not answer_id:
+            return Response({'error': 'answer_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Content Update
         answer = get_object_or_404(Answer, pk=answer_id)
-
         form = AnswerForm(request.POST, request.FILES, instance=answer)
         if form.is_valid():
             original_answer = Answer.objects.get(pk=answer_id)
 
             answer = form.save(commit=False)
             answer.modified_at = timezone.now()
+            
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
 
             # Update review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_answer.image:
@@ -490,75 +370,37 @@ def update_class_answer(request):
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'qnas/answers/{answer.question.id}/{answer.id}/{image.name}')
                 answer.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/qnas/answers/{answer.question.id}/{answer.id}/{image.name}'
-
-            answer.save()
             
-            return JsonResponse({
-                'status': 'success',
-                'message': 'answer updated successfully',
-                'answer': {
-                    'id': escape(answer.id),
-                    'author': escape(answer.author.username),
-                    'content': escape(answer.content),
-                    'image' : escape(answer.image),
-                    'question': escape(answer.question.title),
-                    'created_at': escape(answer.created_at),
-                    'modified_at': escape(answer.modified_at)
-                }
-            }, status=200)
+            answer.save()
+
+            return Response({'message': '답변이 성공적으로 수정되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
-    
-#@login_required(login_url='#')
-@csrf_protect
-def delete_class_answer(request):
-    # Delete an answer
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    #로그인 기능 추가 후 수정
-    # Only admin can delete an answer
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated])
+    def delete_answer(self, request, *args, **kwargs):
+        # Delete an Answer
 
-    if request.user != User.objects.get(username='admin'):
-        return JsonResponse({
-            'status': 'error',
-            'message': '관리자 권한이 필요합니다.'
-        }, status=403)
-
-    if request.method == 'DELETE':
-        answer_id = request.GET.get('answer_id')
+        # Only admin can delete an answer
+        if request.user != User.objects.get(is_superuser=True):
+            return Response({'error': '관리자 권한이 필요합니다.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        answer_id = request.query_params.get('answer_id')
         if not answer_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'answer_id가 필요합니다.'
-            }, status=400)
-
+            return Response({'error': 'answer_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
         answer = get_object_or_404(Answer, pk=answer_id)
 
-        # Delete review image to S3
-        if 'image' in request.FILES:
-            image = request.FILES['image']
+        # Update question's answered_at field
+        question = answer.question
+        question.answered_at = None
+        question.save()
 
-            # Delete the previous image
-            if answer.image:
-                existing_image_key = answer.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
-                s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+        # Delete review image to S3
+        if answer.image:
+            existing_image_key = answer.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
+            s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
         answer.delete()
 
-        return JsonResponse({
-            'status': 'success',
-            'message': 'Answer deleted successfully'
-        }, status=200)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+        return Response({'message': '답변이 성공적으로 삭제되었습니다.'}, status=status.HTTP_200_OK)

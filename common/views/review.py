@@ -1,16 +1,17 @@
+import os
 import boto3
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import PageNumberPagination
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from django.http import JsonResponse
-from django.contrib.auth.models import User
-from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_protect
 from django.utils.html import escape
 from django.utils import timezone
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from ..models import Review
-from glass_class.models import GlassClass
-from ..forms import ReviewForm
+from common.models import GlassClass, Product, Review, User
+from common.forms import ReviewForm
+from common.serializers import ReviewSerializer
 from .common import mask_username
 
 
@@ -22,198 +23,161 @@ s3_client = boto3.client(
     region_name=settings.AWS_S3_REGION_NAME
 )
 
-# Glass class Review
+# Pagination Config
+class PaginationConfig(PageNumberPagination):
+    page_size = 5
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def create_class_review(request):
-    # Create a review
+    def get_total_pages(self):
+        if self.page.paginator.count == 0 or self.page_size == 0:
+            return 0
+        page_size = int(self.page_size)
+        return (self.page.paginator.count + page_size - 1) // page_size
 
-    if request.method == 'POST':
+class ReviewViewSets(viewsets.ViewSet):
+    queryset = Review.objects.all()
+    serializer_review = ReviewSerializer
+    pagination = PaginationConfig
 
-        glass_class_id = request.GET.get('glass_class_id')
-        if not glass_class_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'glass_class_id가 필요합니다.'
-            }, status=400)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def create_review(self, request, *args, **kwargs):
+        # Create a review
+        
+        # Check if the user has enrolled in the class or purchased the product
 
-        glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
-
-        # Check if the user has enrolled in the class
-        # 클래스 수강생 관리 모델이 필요... if not glass_class.reservation        
-
-
+        # Save the review
         form = ReviewForm(request.POST, request.FILES)
         if form.is_valid():
             review = form.save(commit=False)
-            review.author = User.objects.get(username='admin')  # 로그인 기능 추가 후 수정 필요
+            review.author = request.user
             review.created_at = timezone.now()
-            review.glass_class = glass_class
 
-            review.save()
+            if 'glass_class_id' not in request.query_params and 'product_id' not in request.query_params:
+                return Response({'error': 'glass_class_id 또는 product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            if 'glass_class_id' in request.query_params:
+                glass_class = get_object_or_404(GlassClass, pk=request.query_params.get('glass_class_id'))
+                review.glass_class = glass_class
+                glass_class.reviews += 1
+                glass_class.total_rating += review.rating
+                glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+                glass_class.save()
+            elif 'product_id' in request.query_params:
+                product = get_object_or_404(Product, pk=request.query_params.get('product_id'))
+                review.product = product
+                product.reviews += 1
+                product.total_rating += review.rating
+                product.average_rating = round(product.total_rating / product.reviews, 1)
+                product.save()
+
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
             
             # Upload review image to S3
             if 'image' in request.FILES:
                 image = request.FILES['image']
+                if not is_valid_image_extension(image):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Upload the new image
                 s3_client.upload_fileobj(image, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image.name}')
                 review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image.name}'
+                review.save()
 
             review.save()
 
-            glass_class.reviews += 1
-            glass_class.total_rating += review.rating
-            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
-
-            glass_class.save()
-
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Review created successfully',
-                'review': {
-                    'id': review.id,
-                    'author': escape(review.author.username),
-                    'content': escape(review.content),
-                    'image': escape(review.image),
-                    'rating': escape(review.rating),
-                    'teacher_rating': escape(review.teacher_rating),
-                    'readiness_rating': escape(review.readiness_rating),
-                    'content_rating': escape(review.content_rating),
-                    'glass_class': escape(review.glass_class.title) if review.glass_class else None,
-                    'created_at': escape(review.created_at),
-                    'modified_at': escape(review.modified_at) if review.modified_at else None
-                }
-            }, status=200)
+            return Response({'message': '리뷰가 성공적으로 등록되었습니다.'}, status=status.HTTP_201_CREATED)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
-
-    return JsonResponse({
-        'status': 'error',
-        'message': '부적절한 요청 메소드입니다.'
-        }, stauts=405)
-
-def read_class_review(request):
-    # Read a review
-
-    if request.method == 'GET':
-
-        glass_class_id = request.GET.get('glass_class_id')
-        if not glass_class_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'glass_class_id가 필요합니다.'
-            }, status=400)
-
-        glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
         
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def read_review(self, request, *args, **kwargs):
+        # Read a review
 
-        # Pagination
-        page = request.GET.get('page', 1)
-        page_size = request.GET.get('page_size', 5)
-
-        # Order by created_at by default
-        page_order = request.GET.get('page_order', '-created_at')
-        vaild_order_fields = ['-created_at', '-rating', 'rating']
-        if page_order not in vaild_order_fields:
+        # Get reviews by glass_class_id or product_id
+        glass_class_id = request.query_params.get('glass_class_id')
+        product_id = request.query_params.get('product_id')
+        if not glass_class_id and not product_id:
+            return Response({'error': 'glass_class_id 또는 product_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get sorted reviews
+        page_order = request.query_params.get('page_order', '-created_at')
+        valid_order = ['-created_at', 'rating', '-rating']
+        if page_order not in valid_order:
             page_order = '-created_at'
 
-        reviews = Review.objects.filter(glass_class = glass_class).order_by(page_order, '-created_at')
-        
-        paginator = Paginator(reviews, page_size)
+        if glass_class_id:
+            glass_class = get_object_or_404(GlassClass, pk=glass_class_id)
+            reviews = self.queryset.filter(glass_class=glass_class).order_by(page_order, '-created_at')
+            average_rating = glass_class.average_rating
+        elif product_id:
+            product = get_object_or_404(Product, pk=product_id)
+            reviews = self.queryset.filter(product=product).order_by(page_order, '-created_at')
+            average_rating = product.average_rating
 
-        try:
-            review_list = paginator.page(page)
-        except PageNotAnInteger:
-            review_list = paginator.page(1)
-        except EmptyPage:
-            review_list = paginator.page(paginator.num_pages)
-        
-        review_data = []
-        for review in review_list:
-            review_data.append({
-                'id': review.id,
-                'author': mask_username(review.author.username),
-                'content': review.content,
-                'image': review.image,
-                'rating': review.rating,
-                'teacher_rating': review.teacher_rating,
-                'readiness_rating': review.readiness_rating,
-                'content_rating': review.content_rating,
-                'glass_class': review.glass_class.title,
-                'created_at': review.created_at,
-                'modified_at': review.modified_at if review.modified_at else None,
-            })
+        # Pagination
+        paginator = self.pagination()
+        page = paginator.paginate_queryset(reviews, request, view=self)
+        if page is not None:
+            review_data = self.serializer_review(page, many=True).data
+            pagenated_review = paginator.get_paginated_response(review_data)
+            pagenated_review.data['total_pages'] = paginator.get_total_pages()
 
-        page_attrs = {
-            'count': paginator.count,
-            'per_page': page_size,
-            'page_range': list(paginator.page_range),
-            'current_page': review_list.number,
-            'previous_page': review_list.previous_page_number() if review_list.has_previous() else None,
-            'next_page': review_list.next_page_number() if review_list.has_next() else None,
-            'start_index': review_list.start_index(),
-            'end_index': review_list.end_index(),
-        }
-        return JsonResponse({
-            'status': 'success',
-            'reviews': review_data,
-            'average_rating': glass_class.average_rating,
-            'paginator': page_attrs
-        }, status=200)
+            # Mask the username
+            for review in pagenated_review.data['results']:
+                author = User.objects.get(pk=review['author'])
+                review['author'] = mask_username(author.name)
+                review['author_id'] = author.email
+
+            return Response({'reviews': pagenated_review.data, 'average_rating': average_rating}, status=status.HTTP_200_OK)
+            
+        return Response({'message': '리뷰가 존재하지 않습니다.'}, status=status.HTTP_200_OK)
     
-    return JsonResponse({
-        'status': 'error',
-        'message': '부적절한 요청 메소드입니다.'
-    }, status=405)
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def update_review(self, request, *args, **kwargs):
+        # Update a review
 
-
-#@login_required(login_url='#')
-@require_POST
-@csrf_protect
-def update_class_review(request):
-    # update a review
-
-    review_id = request.GET.get('review_id')
-    if not review_id:
-        return JsonResponse({
-            'status': 'error',
-            'message': 'review_id가 필요합니다.'
-        }, status=400)
-
-    review = get_object_or_404(Review, pk=review_id)
-
-    '''
-    로그인 기능 추가 후 실행 예정
-    if request.user != review.author:
-        return JsonResponse({
-            'status': 'error',
-            'message': '이 글의 작성자가 아닙니다.'
-        }, status=403)
-    '''
-    if request.method == 'POST':
-
+        review_id = request.query_params.get('review_id')
+        if not review_id:
+            return Response({'error': 'review_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        review = get_object_or_404(self.queryset, pk=review_id)
+        
+        # Author check
+        if request.user != review.author:
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         form = ReviewForm(request.POST, request.FILES, instance=review)
         if form.is_valid():
-            original_review = Review.objects.get(pk=review_id)
+            original_review = self.queryset.get(pk=review_id)
 
-            # Get existing glass_class rating before updating
             glass_class = original_review.glass_class
-            glass_class.total_rating -= original_review.rating
-            glass_class.save()
+            product = original_review.product
+
+            if glass_class:
+                glass_class.total_rating -= original_review.rating
+                glass_class.save()
+            elif product:
+                product.total_rating -= original_review.rating
+                product.save()
 
             review = form.save(commit=False)
-            review.modified_at = timezone.now()
+            
+            # Check the image is vaild
+            def is_valid_image_extension(file):
+                vaild_extensions = ['jpg', 'jpeg', 'png']
+                ext = os.path.splitext(file.name)[1][1:].lower()
+                return ext in vaild_extensions
 
             # Update review image to S3
             if 'image' in request.FILES:
                 image_file = request.FILES['image']
+                if not is_valid_image_extension(image_file):
+                    return Response({'error': 'image는 jpg, jpeg, png 형식이어야 합니다.'}, status=status.HTTP_400_BAD_REQUEST)
 
                 # Delete the previous image
                 if original_review.image:
@@ -223,92 +187,58 @@ def update_class_review(request):
                 # Upload the new image
                 s3_client.upload_fileobj(image_file, settings.AWS_STORAGE_BUCKET_NAME, f'reviews/{review.id}/{image_file.name}')
                 review.image = f'{settings.AWS_S3_CUSTOM_DOMAIN}/reviews/{review.id}/{image_file.name}'
-
+            
+            review.modified_at = timezone.now()
             review.save()
 
-            # Update glass_class rating
-            glass_class.total_rating += review.rating
-            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
-            glass_class.save()
-
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Review updated successfully',
-                'review': {
-                    'id': escape(review.id),
-                    'author': escape(review.author.username),
-                    'content': escape(review.content),
-                    'image': escape(review.image),
-                    'rating': escape(review.rating),
-                    'teacher_rating': escape(review.teacher_rating),
-                    'readiness_rating': escape(review.readiness_rating),
-                    'content_rating': escape(review.content_rating),
-                    'glass_class': escape(review.glass_class.title),
-                    'created_at': escape(review.created_at),
-                    'modified_at': escape(review.modified_at)
-                }
-            }, status=200)
+            # Update glass_class or product rating
+            if glass_class:
+                glass_class.total_rating += review.rating
+                glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+                glass_class.save()
+            elif product:
+                product.total_rating += review.rating
+                product.average_rating = round(product.total_rating / product.reviews, 1)
+                product.save()
+            
+            return Response({'message': '리뷰가 성공적으로 수정되었습니다.'}, status=status.HTTP_200_OK)
         else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.',
-                'errors': form.errors
-            }, status=400)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
+            return Response({'error': '입력 항목에 부적절한 값이나 누락된 값이 있습니다.', 'errors': form.errors}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=False, methods=['delete'], permission_classes=[IsAuthenticated])
+    def delete_review(self, request, *args, **kwargs):
+        # Delete a review
 
-#@login_required(login_url='#')
-@csrf_protect
-def delete_class_review(request):
-    # Delete a review
-    
-    if request.method == 'DELETE':
-        review_id = request.GET.get('review_id')
+        review_id = request.query_params.get('review_id')
         if not review_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'review_id가 필요합니다.'
-            }, status=400)
+            return Response({'error': 'review_id가 필요합니다.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        user_id = request.GET.get('user_id')
-        if not user_id:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'user_id가 필요합니다.'
-            }, status=400)
-
         review = get_object_or_404(Review, pk=review_id)
-        user = get_object_or_404(User, pk=user_id)
-        
-        if user == review.author or user == User.objects.get(username='admin'):
-            # Delete review image from S3
-            if review.image:
-                existing_image_key = review.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
-                s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
 
-            # Update glass_class rating
-            glass_class = review.glass_class
+        # Author check
+        if request.user != review.author and request.user != User.objects.get(is_superuser=True):
+            return Response({'error': '이 글의 작성자가 아닙니다.'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # Delete review image from S3
+        if review.image:
+            existing_image_key = review.image.split(f'{settings.AWS_S3_CUSTOM_DOMAIN}/')[1]
+            s3_client.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=existing_image_key)
+
+        # Update glass_class or product rating
+        glass_class = review.glass_class
+        product = review.product
+
+        if glass_class:
             glass_class.reviews -= 1
             glass_class.total_rating -= review.rating
-            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1)
+            glass_class.average_rating = round(glass_class.total_rating / glass_class.reviews, 1) if glass_class.reviews != 0 else 0
             glass_class.save()
+        elif product:
+            product.reviews -= 1
+            product.total_rating -= review.rating
+            product.average_rating = round(product.total_rating / product.reviews, 1) if product.reviews != 0 else 0
+            product.save()
+        
+        review.delete()
 
-            review.delete()
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Review deleted successfully'
-            }, status=200)
-        else:
-            return JsonResponse({
-                'status': 'error',
-                'message': '이 글의 작성자가 아닙니다.'
-            }, status=403)
-    else:
-        return JsonResponse({
-            'status': 'error',
-            'message': '부적절한 요청 메소드입니다.'
-        }, status=405)
-    
+        return Response({'message': '리뷰가 성공적으로 삭제되었습니다.'}, status=status.HTTP_200_OK)

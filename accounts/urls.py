@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import RegisterAPIView, LoginAPIView, NaverLoginAPIView, NaverCallbackAPIView, NaverUserDataAPIViewSets, LoginToDjangoAPIViewSets, NaverToDjangoLoginView, LogoutAPIView, CheckEmailAPIView, RestoreEmail, ResetPassword, UpdateUserAPIView
+from .views import RegisterAPIView, LoginAPIView, NaverLoginAPIView, NaverCallbackAPIView, NaverUserDataAPIViewSets, LoginToDjangoAPIViewSets, NaverToDjangoLoginView, LogoutAPIView, CheckEmailAPIView, RestoreEmail, ResetPassword, UpdateUserAPIView, IsAdmin
 
 app_name = 'accounts'
 
@@ -22,5 +22,6 @@ urlpatterns = [
     path('auth/restore-email/', RestoreEmail.as_view(), name='restore-email'),
     path('auth/reset-password/', ResetPassword.as_view(), name='reset-password'),
     path('auth/update-user/', UpdateUserAPIView.as_view(), name='update-user'),
+    path('auth/is-admin/', IsAdmin.as_view(), name='is-admin'),
     
 ]
