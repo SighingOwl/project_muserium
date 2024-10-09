@@ -3,7 +3,7 @@ name: CI Pipeline
 on:
   pull_request:
     branches:
-      - "**"
+      - "class-dev"
 
 permissions:
   contents: read
@@ -71,7 +71,7 @@ jobs:
         if: github.head_ref == 'class-dev' || github.head_ref == 'class-dev' && github.base_ref == 'test-merge'
         run: |
           SECURE_SSL_REDIRECT=False poetry run pytest --cov=glass_class glass_class/tests --cov-report=xml:coverages/coverage_class.xml
-          sed -i 's|<source>.*</source>|<source>class</source>|g' coverages/coverage_class.xml
+          sed -i 's|<source>.*</source>|<source>glass_class</source>|g' coverages/coverage_class.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
       - name: Run SonarCloud Scan for class-dev
