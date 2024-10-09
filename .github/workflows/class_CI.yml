@@ -1,0 +1,88 @@
+name: CI Pipeling
+
+on:
+  pull_request:
+    branches:
+      - 'class-dev'
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+  checks: write
+  deployments: write
+  statuses: write
+
+env:
+  PYTHON_VERSION: '3.12' # Python version to use
+  POETRY_CACHE_DIR: '~/.cache/pypoetry'
+
+jobs:
+  code_test_and_analysis-class-dev:
+    name: Code Test and Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      # Poetry와 SonarCloud를 사용하기 위해 캐시를 설정
+      - name: Cache Poetry and Virtualenv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.POETRY_CACHE_DIR }}
+            ./.venv
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      # django 프로젝트에서 사용할 비밀을 json으로 받아와 적용
+      - name: Create secrets.json
+        run: |
+          printf "%s" '${{ secrets.SECRETS_JSON }}' > secrets.json
+
+      # Poetry를 사용해 의존성을 관리하므로 pip 대신 워크플로우에 poetry를 사용하도록 설정    
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo 'export PATH="$HOME/.local/bin:$PATH"' >> $GITHUB_ENV
+          poetry --version
+
+      - name: Setup virtualenv for Poetry
+        run: |
+          poetry config virtualenvs.in-project true
+
+      - name: Install Dependencies
+        run: |
+          poetry install --no-root
+
+      # pytest를 사용해 push되는 브랜치별로 개발 중인 앱의 테스트를 실행 및 커버리지 파일 생성
+      - name: Create Coverage Directory
+        run: |
+          mkdir -p coverages
+
+      - name: Run Pytest on class-dev branch
+        if: github.head_ref == 'class-dev' || github.head_ref == 'class-dev' && github.base_ref == 'test-merge'
+        run: |
+          SECURE_SSL_REDIRECT=False poetry run pytest --cov=glass_class glass_class/tests --cov-report=xml:coverages/coverage_class.xml
+          sed -i 's|<source>.*</source>|<source>class</source>|g' coverages/coverage_class.xml
+
+      # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
+      - name: Run SonarCloud Scan for class-dev
+        if: github.head_ref == 'class-dev' || github.head_ref == 'class-dev' && github.base_ref == 'test-merge'
+        uses: SonarSource/sonarcloud-github-action@v3.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.sources=glass_class
+            -Dsonar.python.coverage.reportPaths=coverages/coverage_class.xml
