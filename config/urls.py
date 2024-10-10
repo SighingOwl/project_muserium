@@ -26,7 +26,7 @@ urlpatterns = [
     path('main_page/', include('main_page.urls')),
     #path('about/', include('about.urls')),
     path('class/', include('glass_class.urls')),
-    #path('shop/', include('shop.urls')),
+    path('shop/', include('shop.urls')),
 
 ]
 

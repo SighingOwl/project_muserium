@@ -1,9 +1,12 @@
 from django.db import models
 from django.conf import settings
-from django.contrib.auth.models import User
+from accounts.models import User
 
 class GlassClass(models.Model):
     # Glass Class model
+    class Meta:
+        app_label = 'glass_class'
+
     title = models.CharField(max_length=127)
     teacher = models.CharField(max_length=50, default='이소정')
     category = models.CharField(max_length=50, default='One Day Class')
@@ -24,6 +27,9 @@ class GlassClass(models.Model):
 
 class Reservation(models.Model):
     # Class Reservation model
+    class Meta:
+        app_label = 'glass_class'
+
     STAUTS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -35,6 +41,7 @@ class Reservation(models.Model):
     reservation_date = models.DateField()
     reservation_time = models.TimeField()
     created_at = models.DateTimeField()
+    modified_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=50, default='pending')
 
     def __str__(self):

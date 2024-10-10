@@ -1,10 +1,14 @@
 from django.db import models
-from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-from .managers import UserManager
+from accounts.managers import UserManager
 
 class User(AbstractBaseUser, PermissionsMixin):
+    class Meta:
+        app_label = 'accounts'
 
+    def __str__(self):
+        return self.email
+    
     username = models.CharField(max_length=128, blank=True)
     email = models.EmailField(db_index=True, unique=True)
     mobile = models.CharField(max_length=13, blank=True)
@@ -21,5 +25,4 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = UserManager()
 
-    def __str__(self):
-        return self.email
+    

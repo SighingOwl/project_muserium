@@ -45,3 +45,4 @@
 **run_uvicorn.sh
 **backup
 **pyproject_tmp.toml
+**coverage**
