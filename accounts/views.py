@@ -1,6 +1,5 @@
 from django.conf import settings
-from django.shortcuts import redirect
-from django.http import JsonResponse
+from django.shortcuts import redirect, get_object_or_404
 from rest_framework.views import APIView
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -12,13 +11,12 @@ from allauth.socialaccount.providers.oauth2.client import OAuth2Client
 from allauth.socialaccount.providers.naver import views as naver_views
 from dj_rest_auth.registration.views import SocialLoginView
 from dj_rest_auth.views import LogoutView
-from .models import User
-from .serializers import UserInfoSerializer, RegisterSerializer, UserSerializer
+from accounts.models import User
+from accounts.serializers import UserInfoSerializer, RegisterSerializer, UserSerializer
 
 import requests
 import certifi
 
-# main domain(http://127.0.0.1:8000)
 main_domain = settings.MAIN_DOMAIN
 frontend_domain = 'https://localhost:5173'
 
@@ -30,16 +28,16 @@ class LoginAPIView(APIView):
         password = request.data.get('password', None)
 
         if email is None:
-            return JsonResponse({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
         if password is None:
-            return JsonResponse({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             user = User.objects.get(email=email)
             if not user.check_password(password):
-                return JsonResponse({"error": "Password is incorrect."}, status=status.HTTP_204_NO_CONTENT)
+                return Response({"error": "Password is incorrect."}, status=status.HTTP_401_UNAUTHORIZED)
         except User.DoesNotExist:
-            return JsonResponse({"error": "User does not exist."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "User does not exist."}, status=status.HTTP_401_UNAUTHORIZED)
         
         token = TokenObtainPairSerializer().get_token(user)
         refresh_token = str(token)
@@ -103,7 +101,7 @@ class NaverCallbackAPIView(APIView):
             return redirect(f"{frontend_domain}/proceed-login/?access_token={access_token}&code={code}/")
         
         except Exception as e:
-            return JsonResponse({
+            return Response({
                 "error": e,
             }, status=status.HTTP_404_NOT_FOUND)
 
@@ -264,7 +262,7 @@ class LogoutAPIView(LogoutView):
         # Revoke Token
         naver_token = request.data.get('naver_token', None)
         if naver_token is None:
-            return JsonResponse({"error": "Naver Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Naver Token is required."}, status=status.HTTP_400_BAD_REQUEST)
         
         token_revoke_url = "https://nid.naver.com/oauth2.0/token"
         params = {
@@ -276,7 +274,7 @@ class LogoutAPIView(LogoutView):
         }
         reponse = requests.post(token_revoke_url, params=params)
         if reponse.status_code != 200:
-            return JsonResponse({"error": "Failed to logout."}, status=reponse.status_code)
+            return Resp의onse({"error": "Failed to logout."}, status=reponse.status_code)
         '''
         # django logout
         return super().post(request, *args, **kwargs)
@@ -314,7 +312,7 @@ class RegisterAPIView(APIView):
                 }
             }, status=status.HTTP_201_CREATED)
         else:
-            return JsonResponse({
+            return Response({
                 "error": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
         
@@ -322,14 +320,20 @@ class UpdateUserAPIView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
-        user = User.objects.get(email=request.data.get('email'))
+        user = get_object_or_404(User, email = request.query_params.get('email', None))
         
         if request.headers.get('new_password', None) is not None:
             if not user.check_password(request.headers.get('current_password')):
                 return Response({"error": "현재 비밀번호가 일치하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not self.is_valid_password(request.headers.get('new_password')):
+                return Response({"error": "비밀번호 형식이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+            
             user.set_password(request.headers.get('new_password'))
         
         if request.data.get('mobile', None) is not None:
+            if not self.is_valid_mobile(request.data.get('mobile')):
+                return Response({"error": "휴대폰 번호 형식이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
             user.mobile = request.data.get('mobile')
         
         if request.data.get('postcode', None) is not None:
@@ -341,19 +345,33 @@ class UpdateUserAPIView(APIView):
         user.save()
         return Response({"message": "정보가 성공적으로 변경되었습니다."}, status=status.HTTP_200_OK)
     
+    # vaildation check
+    def is_valid_mobile(self, mobile):
+        import re
+
+        mobile_regex = r'^010\d{8}$'
+        return re.match(mobile_regex, mobile) is not None
+    
+    def is_valid_password(self, password):
+        import re
+
+        password_regex = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$'
+        return re.match(password_regex, password) is not None
+
+    
 class CheckEmailAPIView(APIView):
     permission_classes = (AllowAny,)
 
     def get(self, request, *args, **kwargs):
         email = request.query_params.get('email', None)
         if email is None:
-            return JsonResponse({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             user = User.objects.get(email=email)
-            return JsonResponse({"exists": True}, status=status.HTTP_200_OK)
+            return Response({"exists": True}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return JsonResponse({"exists": False}, status=status.HTTP_200_OK)
+            return Response({"exists": False}, status=status.HTTP_200_OK)
 
 class RestoreEmail(APIView):
     permission_classes = (AllowAny,)
