@@ -26,19 +26,19 @@ class LoginAPIViewTest(APITestCase):
 
     def test_login_success(self):
         data = {'email': 'test@example.com', 'password': 'PassWord!123'}
-        response = self.client.post(self.login_url, data, format='json')
+        response = self.client.post(self.login_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
 
     def test_login_failure(self):
         data = {'email': 'wrong@example.com', 'password': 'PassWord!123'}
-        response = self.client.post(self.login_url, data, format='json')
+        response = self.client.post(self.login_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('error', response.data)
 
         data = {'email': 'test@example.com', 'password': 'wrongpassword'}
-        response = self.client.post(self.login_url, data, format='json')
+        response = self.client.post(self.login_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('error', response.data)
 
@@ -62,16 +62,16 @@ class LogoutAPIViewTest(APITestCase):
 
         # Login the user
         data = {'email': self.user_data['email'], 'password': self.user_data['password']}
-        response = self.client.post(self.login_url, data, format='json')
+        response = self.client.post(self.login_url, data, format='json', follow=True)
         self.access_token = response.data['access']
     
     def test_logout_success(self):
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = self.client.post(self.logout_url, headers=headers)
+        response = self.client.post(self.logout_url, headers=headers, follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_logout_unauthenticated(self):
-        response = self.client.post(self.logout_url)
+        response = self.client.post(self.logout_url, follow=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('detail', response.data)
 
@@ -136,7 +136,6 @@ class NaverLoginTests(APITestCase):
             'code': 'mock_code'
         }        
         response = self.client.post(login_to_django_url, data, format='json', follow=True)
-        print(response.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
@@ -210,44 +209,44 @@ class RegisterAPIViewTest(APITestCase):
             'name': 'New User',
             'mobile': '01012345679'
         }
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
 
     def test_register_missing_values(self):
         data = {'email': 'newuser@example.com'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_register_invalid_email(self):
         data = {'email': 'newuser', 'password': 'PassWord!123','username': 'NewUser','name': 'New User', 'mobile': '01012345677'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_register_invalid_mobile(self):
         data = {'email': 'test1@example.com', 'password': 'PassWord!123','username': 'NewUser','name': 'New User', 'mobile': '12345678999'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_register_invalid_password(self):
         data = {'email': 'test1@example.com', 'password': 'password','username': 'NewUser','name': 'New User', 'mobile': '01012345677'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_register_existing_email(self):
         data = {'email': 'test@example.com', 'password': 'PassWord!123','username': 'NewUser','name': 'New User', 'mobile': '01012345677'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
     
     def test_register_existing_mobile(self):
         data = {'email': 'test1@example.com', 'password': 'PassWord!123','username': 'NewUser','name': 'New User', 'mobile': '01012345678'}
-        response = self.client.post(self.register_url, data, format='json')
+        response = self.client.post(self.register_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -275,13 +274,13 @@ class UpdateUserAPIViewTest(APITestCase):
             'current_password': self.user_data['password'],
             'new_password': 'pAsswOrd!123'
         }
-        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}')
+        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}', follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_update_user_invalid_mobile(self):
         # Invalid mobile number
         data = {'mobile': '12345678999'}
-        response = self.client.post(self.update_user_url, data, format='json', QUERY_STRING=f'email={self.user.email}')
+        response = self.client.post(self.update_user_url, data, format='json', QUERY_STRING=f'email={self.user.email}', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -292,7 +291,7 @@ class UpdateUserAPIViewTest(APITestCase):
             'current_password': self.user_data['password'],
             'new_password': 'password'
         }
-        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}')
+        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -303,20 +302,20 @@ class UpdateUserAPIViewTest(APITestCase):
             'current_password': 'wrongpassword',
             'new_password': 'pAsswOrd!123'
         }
-        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}')
+        response = self.client.post(self.update_user_url, data, format='json', headers=headers, QUERY_STRING=f'email={self.user.email}', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_update_user_unknown_user(self):
         data = {'mobile': '01087654321'}
-        response = self.client.post(self.update_user_url, data, format='json', QUERY_STRING=f'email="wrong@exampel.com"')
+        response = self.client.post(self.update_user_url, data, format='json', QUERY_STRING=f'email="wrong@exampel.com"', follow=True)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('detail', response.data)
     
     def test_update_user_unauthenticated(self):
         self.client.force_authenticate(user=None)
         data = {'mobile': '01087654321'}
-        response = self.client.post(self.update_user_url, data, format='json' ,QUERY_STRING=f'email={self.user.email}')
+        response = self.client.post(self.update_user_url, data, format='json' ,QUERY_STRING=f'email={self.user.email}', follow=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('detail', response.data)
 
@@ -326,20 +325,20 @@ class CheckEmailAPIViewTest(APITestCase):
         self.user = User.objects.create_user(email='test@example.com', username='TestUser', password='password123')
 
         # URL for the check email API
-        self.url = reverse('accounts:check-email')
+        self.check_email_url = reverse('accounts:check-email')
 
     def test_check_email_exists(self):
-        response = self.client.get(self.url, {'email': 'test@example.com'})
+        response = self.client.get(self.check_email_url, {'email': 'test@example.com'}, follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['exists'])
 
     def test_check_email_not_exists(self):
-        response = self.client.get(self.url, {'email': 'notexists@example.com'})
+        response = self.client.get(self.check_email_url, {'email': 'notexists@example.com'}, follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['exists'])
 
     def test_check_email_missing(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.check_email_url, follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -353,25 +352,25 @@ class RestoreEmailTest(APITestCase):
         
     def test_restore_email_success(self):
         data = {'name': 'Test User', 'mobile': '01012345678'}
-        response = self.client.post(self.restore_email_url, data, format='json')
+        response = self.client.post(self.restore_email_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['email'], 'test@example.com')
 
     def test_restore_email_unknown_user(self):
         data = {'name': 'Wrong User', 'mobile': '01012345678'}
-        response = self.client.post(self.restore_email_url, data, format='json')
+        response = self.client.post(self.restore_email_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('error', response.data)
 
     def test_restore_email_missing_name(self):
         data = {'mobile': '01012345678'}
-        response = self.client.post(self.restore_email_url, data, format='json')
+        response = self.client.post(self.restore_email_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
     
     def test_restore_email_missing_mobile(self):
         data = {'name': 'Test User'}
-        response = self.client.post(self.restore_email_url, data, format='json')
+        response = self.client.post(self.restore_email_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -385,25 +384,25 @@ class ResetPasswordTest(APITestCase):
 
     def test_reset_password_success(self):
         data = {'email': self.user.email, 'name': self.user.name}
-        response = self.client.post(self.reset_password_url, data, format='json')
+        response = self.client.post(self.reset_password_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('password', response.data)
 
     def test_reset_password_unknown_user(self):
         data = {'email': 'wrong@example.com', 'name': self.user.name}
-        response = self.client.post(self.reset_password_url, data, format='json')
+        response = self.client.post(self.reset_password_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIn('error', response.data)
     
     def test_reset_password_missing_email(self):
         data = {'name': self.user.name}
-        response = self.client.post(self.reset_password_url, data, format='json')
+        response = self.client.post(self.reset_password_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
     def test_reset_password_missing_name(self):
         data = {'email': self.user.email}
-        response = self.client.post(self.reset_password_url, data, format='json')
+        response = self.client.post(self.reset_password_url, data, format='json', follow=True)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('error', response.data)
 
@@ -418,17 +417,17 @@ class IsAdminTest(APITestCase):
 
     def test_is_admin(self):
         self.client.force_authenticate(user=self.admin_user)
-        response = self.client.get(self.is_admin_url)
+        response = self.client.get(self.is_admin_url, follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['is_admin'])
 
     def test_is_not_admin(self):
         self.client.force_authenticate(user=self.user)
-        response = self.client.get(self.is_admin_url)
+        response = self.client.get(self.is_admin_url, follow=True)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data['is_admin'])
 
     def test_is_not_authenticated(self):
-        response = self.client.get(self.is_admin_url)
+        response = self.client.get(self.is_admin_url, follow=True)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertIn('detail', response.data)
