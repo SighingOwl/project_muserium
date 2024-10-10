@@ -38,6 +38,10 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    # asgi server
+    'channels',
+
+    # Django Default Apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -61,18 +65,24 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.naver',
+    
+    # django pytest
+    'pytest',
 
     # CORS
     'corsheaders',
+
     # Muserium Apps
     'accounts',
     'common',
     'main_page',
     'glass_class',
+    'shop',
 
 ]
 
 MIDDLEWARE = [
+    # django default middleware
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -80,7 +90,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    # cors middleware
     'corsheaders.middleware.CorsMiddleware',
+
+    # allauth middleware
     'allauth.account.middleware.AccountMiddleware',
 ]
 
@@ -124,7 +138,7 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{AWS_STORAGE_BUCKET_NAME}/'
 
 # HTTPS Configuration
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
 
 # Cookie Configuration
 SESSION_COOKIE_SECURE = True
@@ -143,12 +157,7 @@ CSRF_COOKIE_SECURE = True
 
 # CORS Configuration
 CORS_ALLOW_CREDENTIALS = True
-CORS_ORIGIN_ALLOW_ALL = False
-CORS_ORIGIN_WHITELIST = (
-    # VUE Frontend Port
-    'https://localhost:5173',    
-    'https://127.0.0.1:5173',    
-)
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_HEADERS = list(default_headers) + [
     'Authorization',
     'current_password',
@@ -210,9 +219,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ko-kr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
 
@@ -238,3 +247,29 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels.layers.InMemoryChannelLayer'
     }
 }
+
+# Logging configuration
+'''
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+'''

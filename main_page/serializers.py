@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Card, Carousel
+from main_page.models import Card, Carousel
 
 class CardSerializer(serializers.ModelSerializer):
 	class Meta:

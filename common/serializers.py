@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import DetailInfo, Review, Question, Answer, Comment
+from common.models import DetailInfo, Review, Question, Answer, Comment
 
 class DetailInfoSerializer(serializers.ModelSerializer):
     # Detail info serializer
@@ -21,6 +21,13 @@ class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
         fields = '__all__'
+
+class QuestionListSerializer(serializers.ModelSerializer):
+    # Question list serializer
+
+    class Meta:
+        model = Question
+        fields = ['id', 'title', 'author', 'created_at', 'view_count', 'answered_at', 'is_secret']
 
 class AnswerSerializer(serializers.ModelSerializer):
     # Answer serializer
