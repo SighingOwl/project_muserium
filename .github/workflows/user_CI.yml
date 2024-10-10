@@ -73,7 +73,7 @@ jobs:
 
       - name: Run Pytest on user-dev branch
         run: |
-          poetry run pytest --cov=accounts accounts/tests --cov-report=xml:coverages/coverage_accounts.xml
+          SECURE_SSL_REDIRECT=False poetry run pytest --cov=accounts accounts/tests --cov-report=xml:coverages/coverage_accounts.xml
           sed -i 's|<source>.*</source>|<source>accounts</source>|g' coverages/coverage_accounts.xml
 
       # SocarCloud를 사용해 정적 코드 분석을 수행하기 위해 SonarScanner를 다운로드하고 실행
