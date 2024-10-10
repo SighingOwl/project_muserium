@@ -66,7 +66,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.naver',
     
-    # django unittest
+    # django pytest
     'pytest',
 
     # CORS
